@@ -51,13 +51,13 @@
         font-weight: 600;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
       }
-      
+
       /* Car icon styles */
       .car-icon {
         font-size: 20px;
         transition: all 0.5s ease-in-out;
       }
-      
+
       /* Animation controls */
       .animation-controls {
         margin-top: 1rem;
@@ -95,18 +95,18 @@
             class="w-full h-64 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
             placeholder="Example:&#10;2023-01-15, -74.0060, 40.7128&#10;2023-02-20, 2.3522, 48.8566&#10;2023-03-10, 139.6917, 35.6895"
           >
-07/19/2025,-99.39835052,35.34300561
-07/19/2025,-99.39843365,35.34295041
-07/19/2025,-99.28938473,35.73898116
-07/19/2025,-99.2892917,35.73938674
-07/19/2025,-99.32421019,35.91880567
-07/19/2025,-99.28931821,35.73898602
-07/19/2025,-99.28922405,35.73938104
-07/19/2025,-99.32421422,35.91873611
-07/20/2025,-99.32424091,35.91874254
-07/20/2025,-99.22593616,35.9429343
-07/20/2025,-99.2259661,35.94302799
-07/20/2025,-99.32432825,35.91870072
+          2025-07-19 17:24:43	-99.39835052	35.34300561	69111065	Job Started
+          2025-07-19 17:25:09	-99.39843365	35.34295041	69111065	Job Started
+          2025-07-19 18:10:35	-99.28938473	35.73898116	69111065	Arrived At Job Location
+          2025-07-19 18:42:18	-99.2892917	35.73938674	69111065	Off Location
+          2025-07-19 21:15:58	-99.32421019	35.91880567	69111065	Job Started
+          2025-07-19 21:42:48	-99.28931821	35.73898602	69111065	Arrived At Job Location
+          2025-07-19 22:50:58	-99.28922405	35.73938104	69111065	Off Location
+          2025-07-19 23:33:32	-99.32421422	35.91873611	69111065	Job Ended
+          2025-07-20 20:49:54	-99.32424091	35.91874254	69111149	Job Started
+          2025-07-20 21:16:34	-99.22593616	35.9429343	69111149	Arrived At Job Location
+          2025-07-20 22:14:30	-99.2259661	35.94302799	69111149	Off Location
+          2025-07-20 22:58:24	-99.32432825	35.91870072	69111149	Job Ended
 </textarea
           >
 
@@ -126,6 +126,13 @@
               🚗 Start Car Animation
             </button>
             <button
+              id="pauseButton"
+              class="w-full bg-yellow-600 text-white font-bold py-2 px-4 rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition mb-2"
+              disabled
+            >
+              ⏸️ Pause Animation
+            </button>
+            <button
               id="stopButton"
               class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition"
               disabled
@@ -134,7 +141,14 @@
             </button>
             <div class="mt-2 text-sm text-gray-600">
               <span>Speed: </span>
-              <input type="range" id="speedSlider" min="100" max="2000" value="1000" class="w-full">
+              <input
+                type="range"
+                id="speedSlider"
+                min="100"
+                max="2000"
+                value="1000"
+                class="w-full"
+              />
               <span id="speedValue">1000ms</span>
             </div>
           </div>
@@ -168,6 +182,7 @@
       const locationDataInput = document.getElementById("locationData");
       const messageBox = document.getElementById("messageBox");
       const animateButton = document.getElementById("animateButton");
+      const pauseButton = document.getElementById("pauseButton");
       const stopButton = document.getElementById("stopButton");
       const speedSlider = document.getElementById("speedSlider");
       const speedValue = document.getElementById("speedValue");
@@ -180,6 +195,7 @@
       let animationInterval = null;
       let currentLocationIndex = 0;
       let locations = [];
+      let isPaused = false;
 
       // --- FUNCTIONS ---
 
@@ -272,12 +288,12 @@
           // Create a marker for the location
           const marker = L.marker(latLng).addTo(map);
 
-          // Bind a permanent tooltip to the marker to show the date
+          // Bind a tooltip to the marker (not permanent by default)
           marker.bindTooltip(loc.date, {
-            permanent: true,
+            permanent: false, // Only show on hover when not animating
             direction: "top",
             offset: [0, -10],
-            className: "leaflet-tooltip-permanent", // Apply custom class for styling
+            className: "leaflet-tooltip-permanent",
           });
 
           markers.push(marker);
@@ -291,6 +307,23 @@
       }
 
       /**
+       * Shows or hides permanent tooltips on location markers
+       */
+      function toggleLocationLabels(show) {
+        markers.forEach((marker) => {
+          if (show) {
+            // Show permanent tooltips
+            marker.getTooltip().options.permanent = true;
+            marker.openTooltip();
+          } else {
+            // Hide permanent tooltips
+            marker.getTooltip().options.permanent = false;
+            marker.closeTooltip();
+          }
+        });
+      }
+
+      /**
        * Creates a custom car icon
        */
       function createCarIcon() {
@@ -298,7 +331,7 @@
           html: '<div style="font-size: 24px; text-align: center;">🚗</div>',
           iconSize: [30, 30],
           iconAnchor: [15, 15],
-          className: 'car-icon'
+          className: "car-icon",
         });
       }
 
@@ -307,30 +340,49 @@
        */
       function startCarAnimation() {
         if (!locations || locations.length === 0) {
-          messageBox.textContent = "Please plot locations first before starting animation.";
+          messageBox.textContent =
+            "Please plot locations first before starting animation.";
+          return;
+        }
+
+        // If resuming from pause, don't reset everything
+        if (isPaused && carMarker) {
+          isPaused = false;
+          animateButton.disabled = true;
+          pauseButton.disabled = false;
+          stopButton.disabled = false;
+
+          // Resume animation
+          const speed = parseInt(speedSlider.value);
+          animationInterval = setInterval(moveCarToNextLocation, speed);
           return;
         }
 
         // Clear any existing animation
         stopCarAnimation();
 
+        // Hide all location labels during animation
+        toggleLocationLabels(false);
+
         // Create car marker at first location
         currentLocationIndex = 0;
         const firstLocation = locations[0];
         carMarker = L.marker([firstLocation.lat, firstLocation.lon], {
-          icon: createCarIcon()
+          icon: createCarIcon(),
         }).addTo(map);
 
         // Add tooltip to show current date
         carMarker.bindTooltip(firstLocation.date, {
           permanent: true,
-          direction: 'top',
-          offset: [0, -20]
+          direction: "top",
+          offset: [0, -20],
         });
 
-        // Enable stop button, disable start button
+        // Update button states
         animateButton.disabled = true;
+        pauseButton.disabled = false;
         stopButton.disabled = false;
+        isPaused = false;
 
         // Start animation interval
         const speed = parseInt(speedSlider.value);
@@ -342,7 +394,7 @@
        */
       function moveCarToNextLocation() {
         currentLocationIndex++;
-        
+
         if (currentLocationIndex >= locations.length) {
           // Animation complete, restart from beginning
           currentLocationIndex = 0;
@@ -350,15 +402,35 @@
 
         const nextLocation = locations[currentLocationIndex];
         const newLatLng = [nextLocation.lat, nextLocation.lon];
-        
+
         // Move car marker to new position
         carMarker.setLatLng(newLatLng);
-        
+
         // Update tooltip with new date
         carMarker.setTooltipContent(nextLocation.date);
-        
+
         // Pan map to follow the car
         map.panTo(newLatLng);
+      }
+
+      /**
+       * Pauses the car animation
+       */
+      function pauseCarAnimation() {
+        if (animationInterval) {
+          clearInterval(animationInterval);
+          animationInterval = null;
+        }
+
+        isPaused = true;
+
+        // Update button states
+        animateButton.disabled = false;
+        pauseButton.disabled = true;
+        stopButton.disabled = false;
+
+        // Change start button text to "Resume"
+        animateButton.textContent = "▶️ Resume Animation";
       }
 
       /**
@@ -369,24 +441,32 @@
           clearInterval(animationInterval);
           animationInterval = null;
         }
-        
+
         if (carMarker) {
           map.removeLayer(carMarker);
           carMarker = null;
         }
 
-        // Reset buttons
+        // Show location labels again when animation stops
+        toggleLocationLabels(true);
+
+        // Reset buttons and state
         animateButton.disabled = false;
+        pauseButton.disabled = true;
         stopButton.disabled = true;
+        isPaused = false;
         currentLocationIndex = 0;
+
+        // Reset start button text
+        animateButton.textContent = "🚗 Start Car Animation";
       }
 
       /**
        * Updates speed display
        */
       function updateSpeedDisplay() {
-        speedValue.textContent = speedSlider.value + 'ms';
-        
+        speedValue.textContent = speedSlider.value + "ms";
+
         // If animation is running, restart with new speed
         if (animationInterval) {
           clearInterval(animationInterval);
@@ -398,6 +478,7 @@
       // --- EVENT LISTENERS ---
       plotButton.addEventListener("click", plotLocations);
       animateButton.addEventListener("click", startCarAnimation);
+      pauseButton.addEventListener("click", pauseCarAnimation);
       stopButton.addEventListener("click", stopCarAnimation);
       speedSlider.addEventListener("input", updateSpeedDisplay);
 
