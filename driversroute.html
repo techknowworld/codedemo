@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Data Mapper</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet.js for the interactive map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Set a default font for the application */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Ensure the map container has a defined height */
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 0.5rem;
+        }
+        /* Style for permanent tooltips on the map */
+        .leaflet-tooltip-permanent {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(5px);
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #333;
+            font-weight: 600;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Location Data Mapper</h1>
+            <p class="text-gray-600 mt-2">Paste your location data to see it on the map.</p>
+        </header>
+
+        <div class="flex flex-col md:flex-row gap-8">
+
+            <!-- Left Panel: Input and Controls -->
+            <div class="w-full md:w-1/3 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold mb-4">Input Data</h2>
+                <p class="text-sm text-gray-500 mb-2">
+                    Paste your data below. Each line should be in the format: 
+                    <code class="bg-gray-200 p-1 rounded text-xs">Date, Longitude, Latitude</code>.
+                </p>
+                
+                <textarea id="locationData" class="w-full h-64 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Example:&#10;2023-01-15, -74.0060, 40.7128&#10;2023-02-20, 2.3522, 48.8566&#10;2023-03-10, 139.6917, 35.6895">
+07/19/2025,-99.39835052,35.34300561
+07/19/2025,-99.39843365,35.34295041
+07/19/2025,-99.28938473,35.73898116
+07/19/2025,-99.2892917,35.73938674
+07/19/2025,-99.32421019,35.91880567
+07/19/2025,-99.28931821,35.73898602
+07/19/2025,-99.28922405,35.73938104
+07/19/2025,-99.32421422,35.91873611
+07/20/2025,-99.32424091,35.91874254
+07/20/2025,-99.22593616,35.9429343
+07/20/2025,-99.2259661,35.94302799
+07/20/2025,-99.32432825,35.91870072
+</textarea>
+                
+                <button id="plotButton" class="mt-4 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-105">
+                    Show on Map
+                </button>
+
+                <div id="messageBox" class="mt-4 text-sm text-red-600"></div>
+            </div>
+
+            <!-- Right Panel: Map Display -->
+            <div class="w-full md:w-2/3 h-96 md:h-auto bg-white rounded-lg shadow-md">
+                <div id="map"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- MAP INITIALIZATION ---
+        // Initialize the map and set its view to a default location and zoom level
+        const map = L.map('map').setView([20, 0], 2);
+
+        // Add a tile layer to the map (the map's background image)
+        // Using OpenStreetMap for a clean, free map source
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // --- DOM ELEMENT REFERENCES ---
+        const plotButton = document.getElementById('plotButton');
+        const locationDataInput = document.getElementById('locationData');
+        const messageBox = document.getElementById('messageBox');
+        
+        // --- GLOBAL STATE ---
+        // Array to keep track of markers currently on the map
+        let markers = [];
+
+        // --- FUNCTIONS ---
+
+        /**
+         * Clears all existing markers from the map.
+         */
+        function clearMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = []; // Reset the markers array
+        }
+
+        /**
+         * Parses the input text, validates it, and returns an array of location objects.
+         * @returns {Array|null} An array of location objects or null if parsing fails.
+         */
+        function parseLocationData() {
+            const text = locationDataInput.value.trim();
+            if (!text) {
+                messageBox.textContent = 'Input data cannot be empty.';
+                return null;
+            }
+
+            const lines = text.split('\n');
+            const locations = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line === '') continue; // Skip empty lines
+
+                const parts = line.split(',');
+                if (parts.length !== 3) {
+                    messageBox.textContent = `Error on line ${i + 1}: Each line must have 3 parts (Date, Longitude, Latitude).`;
+                    return null;
+                }
+
+                const [dateStr, lonStr, latStr] = parts.map(p => p.trim());
+
+                const lat = parseFloat(latStr);
+                const lon = parseFloat(lonStr);
+
+                // Validate latitude and longitude
+                if (isNaN(lat) || isNaN(lon)) {
+                    messageBox.textContent = `Error on line ${i + 1}: Invalid latitude or longitude. Please check your numbers.`;
+                    return null;
+                }
+                if (lat < -90 || lat > 90) {
+                    messageBox.textContent = `Error on line ${i + 1}: Latitude must be between -90 and 90.`;
+                    return null;
+                }
+                if (lon < -180 || lon > 180) {
+                    messageBox.textContent = `Error on line ${i + 1}: Longitude must be between -180 and 180.`;
+                    return null;
+                }
+
+                locations.push({ date: dateStr, lat, lon });
+            }
+            
+            messageBox.textContent = ''; // Clear any previous error messages
+            return locations;
+        }
+
+        /**
+         * Plots the locations on the map.
+         */
+        function plotLocations() {
+            clearMarkers();
+            const locations = parseLocationData();
+
+            if (!locations || locations.length === 0) {
+                if (!messageBox.textContent) {
+                    messageBox.textContent = 'No valid locations to plot.';
+                }
+                return;
+            }
+
+            const latLngs = [];
+
+            locations.forEach(loc => {
+                const latLng = [loc.lat, loc.lon];
+                latLngs.push(latLng);
+
+                // Create a marker for the location
+                const marker = L.marker(latLng).addTo(map);
+
+                // Bind a permanent tooltip to the marker to show the date
+                marker.bindTooltip(loc.date, {
+                    permanent: true,
+                    direction: 'top',
+                    offset: [0, -10],
+                    className: 'leaflet-tooltip-permanent' // Apply custom class for styling
+                });
+                
+                markers.push(marker);
+            });
+
+            // Adjust the map view to fit all the markers
+            if (latLngs.length > 0) {
+                const bounds = L.latLngBounds(latLngs);
+                map.fitBounds(bounds, { padding: [50, 50] }); // Add padding to avoid markers being on the edge
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+        plotButton.addEventListener('click', plotLocations);
+
+        // --- INITIAL PLOT ---
+        // Plot the default data when the page loads
+        window.onload = plotLocations;
+    </script>
+
+</body>
+</html>
