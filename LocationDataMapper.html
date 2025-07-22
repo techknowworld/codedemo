@@ -86,14 +86,14 @@
           <p class="text-sm text-gray-500 mb-2">
             Paste your data below. Each line should be in the format:
             <code class="bg-gray-200 p-1 rounded text-xs"
-              >Date, Longitude, Latitude</code
+              >Date/Time, Longitude, Latitude, Ticket Number, Status</code
             >.
           </p>
 
           <textarea
             id="locationData"
             class="w-full h-64 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-            placeholder="Example:&#10;2023-01-15, -74.0060, 40.7128&#10;2023-02-20, 2.3522, 48.8566&#10;2023-03-10, 139.6917, 35.6895"
+            placeholder="Example:&#10;2023-01-15 10:30, -74.0060, 40.7128, T001, Active&#10;2023-02-20 14:15, 2.3522, 48.8566, T002, Completed&#10;2023-03-10 09:45, 139.6917, 35.6895, T003, Pending"
           >
           2025-07-19 17:24:43	-99.39835052	35.34300561	69111065	Job Started
           2025-07-19 17:25:09	-99.39843365	35.34295041	69111065	Job Started
@@ -226,14 +226,14 @@
           if (line === "") continue; // Skip empty lines
 
           const parts = line.split(/[,\t]/);
-          if (parts.length !== 3) {
+          if (parts.length !== 5) {
             messageBox.textContent = `Error on line ${
               i + 1
-            }: Each line must have 3 parts (Date, Longitude, Latitude).`;
+            }: Each line must have 5 parts (Date/Time, Longitude, Latitude, Ticket Number, Status).`;
             return null;
           }
 
-          const [dateStr, lonStr, latStr] = parts.map((p) => p.trim());
+          const [dateStr, lonStr, latStr, ticketStr, statusStr] = parts.map((p) => p.trim());
 
           const lat = parseFloat(latStr);
           const lon = parseFloat(lonStr);
@@ -258,7 +258,13 @@
             return null;
           }
 
-          locations.push({ date: dateStr, lat, lon });
+          locations.push({ 
+            date: dateStr, 
+            lat, 
+            lon, 
+            ticket: ticketStr, 
+            status: statusStr 
+          });
         }
 
         messageBox.textContent = ""; // Clear any previous error messages
@@ -288,8 +294,17 @@
           // Create a marker for the location
           const marker = L.marker(latLng).addTo(map);
 
+          // Create rich tooltip content with all information
+          const tooltipContent = `
+            <div style="text-align: center;">
+              <div style="font-weight: bold;">${loc.date}</div>
+              <div style="font-size: 12px; color: #666;">Ticket: ${loc.ticket}</div>
+              <div style="font-size: 12px; color: #333;">${loc.status}</div>
+            </div>
+          `;
+
           // Bind a tooltip to the marker (not permanent by default)
-          marker.bindTooltip(loc.date, {
+          marker.bindTooltip(tooltipContent, {
             permanent: false, // Only show on hover when not animating
             direction: "top",
             offset: [0, -10],
@@ -371,8 +386,17 @@
           icon: createCarIcon(),
         }).addTo(map);
 
-        // Add tooltip to show current date
-        carMarker.bindTooltip(firstLocation.date, {
+        // Create rich tooltip content for car with all information
+        const carTooltipContent = `
+          <div style="text-align: center;">
+            <div style="font-weight: bold;">${firstLocation.date}</div>
+            <div style="font-size: 12px; color: #666;">Ticket: ${firstLocation.ticket}</div>
+            <div style="font-size: 12px; color: #333;">${firstLocation.status}</div>
+          </div>
+        `;
+
+        // Add tooltip to show current information
+        carMarker.bindTooltip(carTooltipContent, {
           permanent: true,
           direction: "top",
           offset: [0, -20],
@@ -406,8 +430,17 @@
         // Move car marker to new position
         carMarker.setLatLng(newLatLng);
 
-        // Update tooltip with new date
-        carMarker.setTooltipContent(nextLocation.date);
+        // Create rich tooltip content with all information for the new location
+        const updatedTooltipContent = `
+          <div style="text-align: center;">
+            <div style="font-weight: bold;">${nextLocation.date}</div>
+            <div style="font-size: 12px; color: #666;">Ticket: ${nextLocation.ticket}</div>
+            <div style="font-size: 12px; color: #333;">${nextLocation.status}</div>
+          </div>
+        `;
+
+        // Update tooltip with new information
+        carMarker.setTooltipContent(updatedTooltipContent);
 
         // Pan map to follow the car
         map.panTo(newLatLng);
