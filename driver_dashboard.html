@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Driver Speed Analytics Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #111827;
+    --bg-card: #1a2235;
+    --bg-card-hover: #1f2a40;
+    --accent-blue: #3b82f6;
+    --accent-cyan: #06b6d4;
+    --accent-green: #10b981;
+    --accent-yellow: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-purple: #8b5cf6;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --border: #1e293b;
+    --glow-blue: rgba(59,130,246,0.15);
+    --glow-cyan: rgba(6,182,212,0.15);
+    --glow-green: rgba(16,185,129,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background:
+      radial-gradient(ellipse at 10% 20%, rgba(59,130,246,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 90% 80%, rgba(6,182,212,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(139,92,246,0.04) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .header-icon {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    box-shadow: 0 0 24px rgba(59,130,246,0.4);
+  }
+
+  .header-title h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #f1f5f9, var(--accent-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header-title p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: 2px;
+  }
+
+  .header-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+  }
+
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: default;
+  }
+
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .kpi-card.blue::before { background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan)); }
+  .kpi-card.green::before { background: linear-gradient(90deg, var(--accent-green), #34d399); }
+  .kpi-card.yellow::before { background: linear-gradient(90deg, var(--accent-yellow), #fbbf24); }
+  .kpi-card.red::before { background: linear-gradient(90deg, var(--accent-red), #f87171); }
+  .kpi-card.purple::before { background: linear-gradient(90deg, var(--accent-purple), #a78bfa); }
+  .kpi-card.cyan::before { background: linear-gradient(90deg, var(--accent-cyan), #67e8f9); }
+
+  .kpi-icon {
+    font-size: 1.5rem;
+    margin-bottom: 12px;
+  }
+
+  .kpi-value {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .kpi-card.blue .kpi-value { color: var(--accent-blue); }
+  .kpi-card.green .kpi-value { color: var(--accent-green); }
+  .kpi-card.yellow .kpi-value { color: var(--accent-yellow); }
+  .kpi-card.red .kpi-value { color: var(--accent-red); }
+  .kpi-card.purple .kpi-value { color: var(--accent-purple); }
+  .kpi-card.cyan .kpi-value { color: var(--accent-cyan); }
+
+  .kpi-unit {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  .kpi-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 6px;
+  }
+
+  .kpi-glow {
+    position: absolute;
+    bottom: -20px;
+    right: -20px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    opacity: 0.15;
+  }
+
+  .kpi-card.blue .kpi-glow { background: var(--accent-blue); }
+  .kpi-card.green .kpi-glow { background: var(--accent-green); }
+  .kpi-card.yellow .kpi-glow { background: var(--accent-yellow); }
+  .kpi-card.red .kpi-glow { background: var(--accent-red); }
+  .kpi-card.purple .kpi-glow { background: var(--accent-purple); }
+  .kpi-card.cyan .kpi-glow { background: var(--accent-cyan); }
+
+  /* Chart Grid */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .chart-grid-3 {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .chart-full {
+    margin-bottom: 20px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    transition: box-shadow 0.2s;
+  }
+
+  .card:hover {
+    box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .card-title-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+
+  .icon-blue { background: rgba(59,130,246,0.15); }
+  .icon-green { background: rgba(16,185,129,0.15); }
+  .icon-yellow { background: rgba(245,158,11,0.15); }
+  .icon-purple { background: rgba(139,92,246,0.15); }
+  .icon-cyan { background: rgba(6,182,212,0.15); }
+  .icon-red { background: rgba(239,68,68,0.15); }
+
+  .card-badge {
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+  .badge-green { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+
+  .chart-container {
+    position: relative;
+    width: 100%;
+  }
+
+  /* Map */
+  #map {
+    height: 420px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* Speed Timeline */
+  .timeline-chart { height: 220px; }
+  .dist-chart { height: 220px; }
+  .hourly-chart { height: 220px; }
+  .city-chart { height: 260px; }
+  .donut-chart { height: 220px; }
+
+  /* Speed Gauge */
+  .gauge-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 0;
+  }
+
+  .gauge-svg {
+    width: 200px;
+    height: 120px;
+  }
+
+  .gauge-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--accent-cyan);
+    text-align: center;
+    line-height: 1;
+  }
+
+  .gauge-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Journey Table */
+  .journey-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  .journey-table th {
+    text-align: left;
+    padding: 8px 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.72rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .journey-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(30,41,59,0.5);
+    color: var(--text-secondary);
+    vertical-align: middle;
+  }
+
+  .journey-table tr:last-child td { border-bottom: none; }
+
+  .journey-table tr:hover td {
+    background: rgba(59,130,246,0.04);
+    color: var(--text-primary);
+  }
+
+  .speed-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.78rem;
+  }
+
+  .speed-stopped { background: rgba(100,116,139,0.2); color: #94a3b8; }
+  .speed-slow { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+  .speed-medium { background: rgba(245,158,11,0.15); color: var(--accent-yellow); }
+  .speed-fast { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+
+  /* City bars */
+  .city-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .city-name {
+    width: 90px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .city-bar-track {
+    flex: 1;
+    height: 8px;
+    background: rgba(30,41,59,0.8);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .city-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s ease;
+  }
+
+  .city-count {
+    width: 45px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* Scrollable table */
+  .table-scroll {
+    max-height: 320px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .table-scroll::-webkit-scrollbar { width: 4px; }
+  .table-scroll::-webkit-scrollbar-track { background: transparent; }
+  .table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Speed indicator bar */
+  .speed-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .speed-bar-track {
+    flex: 1;
+    height: 4px;
+    background: rgba(30,41,59,0.8);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .speed-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .chart-grid, .chart-grid-3 { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 640px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .header { flex-direction: column; gap: 12px; align-items: flex-start; }
+    .container { padding: 16px; }
+  }
+
+  /* Tooltip custom */
+  .custom-tooltip {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    color: var(--text-primary) !important;
+    font-size: 0.82rem !important;
+    padding: 8px 12px !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
+  }
+
+  /* Leaflet dark overrides */
+  .leaflet-container { background: #0d1117; }
+  .leaflet-popup-content-wrapper {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .leaflet-popup-tip { background: var(--bg-card); }
+  .leaflet-popup-content { margin: 12px 16px; font-size: 0.82rem; line-height: 1.6; }
+  .leaflet-control-zoom a {
+    background: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border) !important;
+  }
+  .leaflet-control-attribution {
+    background: rgba(10,14,26,0.8) !important;
+    color: var(--text-muted) !important;
+  }
+
+  /* Section divider */
+  .section-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Animate in */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .kpi-card { animation: fadeUp 0.5s ease both; }
+  .kpi-card:nth-child(1) { animation-delay: 0.05s; }
+  .kpi-card:nth-child(2) { animation-delay: 0.1s; }
+  .kpi-card:nth-child(3) { animation-delay: 0.15s; }
+  .kpi-card:nth-child(4) { animation-delay: 0.2s; }
+  .kpi-card:nth-child(5) { animation-delay: 0.25s; }
+  .kpi-card:nth-child(6) { animation-delay: 0.3s; }
+
+  .card { animation: fadeUp 0.5s ease both; animation-delay: 0.35s; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="header-icon">🚗</div>
+      <div class="header-title">
+        <h1>Driver Speed Analytics</h1>
+        <p>Device: 6330108d7b91d299 &nbsp;·&nbsp; Ticket #69168595 &nbsp;·&nbsp; Oklahoma, United States</p>
+      </div>
+    </div>
+    <div class="header-badge">
+      <div class="live-dot"></div>
+      <span style="font-size:0.82rem; color:var(--text-secondary);">July 3, 2026</span>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="section-label">Key Metrics</div>
+  <div class="kpi-grid">
+    <div class="kpi-card blue">
+      <div class="kpi-icon">📍</div>
+      <div class="kpi-value">8,511 <span class="kpi-unit"></span></div>
+      <div class="kpi-label">Total Location Records</div>
+      <div class="kpi-glow"></div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-icon">⚡</div>
+      <div class="kpi-value">207 <span class="kpi-unit"></span></div>
+      <div class="kpi-label">Speed Data Points</div>
+      <div class="kpi-glow"></div>
+    </div>
+    <div class="kpi-card cyan">
+      <div class="kpi-icon">🏎️</div>
+      <div class="kpi-value">33.0 <span class="kpi-unit">mph</span></div>
+      <div class="kpi-label">Average Speed</div>
+      <div class="kpi-glow"></div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-icon">🔥</div>
+      <div class="kpi-value">75.2 <span class="kpi-unit">mph</span></div>
+      <div class="kpi-label">Peak Speed</div>
+      <div class="kpi-glow"></div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-icon">🗺️</div>
+      <div class="kpi-value">12 <span class="kpi-unit"></span></div>
+      <div class="kpi-label">Cities Visited</div>
+      <div class="kpi-glow"></div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-icon">⏱️</div>
+      <div class="kpi-value">3.2 <span class="kpi-unit">hrs</span></div>
+      <div class="kpi-label">Active Drive Time</div>
+      <div class="kpi-glow"></div>
+    </div>
+  </div>
+
+  <!-- Speed Timeline (full width) -->
+  <div class="section-label">Speed Over Time</div>
+  <div class="card chart-full">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-title-icon icon-blue">📈</div>
+        Speed Timeline — July 3, 2026
+      </div>
+      <span class="card-badge badge-blue">207 readings</span>
+    </div>
+    <div class="chart-container timeline-chart">
+      <canvas id="timelineChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Map + Hourly -->
+  <div class="section-label">Route & Hourly Analysis</div>
+  <div class="chart-grid-3">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon icon-cyan">🗺️</div>
+          Live Route Map — Oklahoma
+        </div>
+        <span class="card-badge badge-green">GPS Tracked</span>
+      </div>
+      <div id="map"></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:20px;">
+      <div class="card" style="flex:1;">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-title-icon icon-yellow">🕐</div>
+            Avg Speed by Hour
+          </div>
+        </div>
+        <div class="chart-container hourly-chart">
+          <canvas id="hourlyChart"></canvas>
+        </div>
+      </div>
+      <div class="card" style="flex:1;">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-title-icon icon-purple">🎯</div>
+            Speed Gauge
+          </div>
+        </div>
+        <div class="gauge-container">
+          <svg class="gauge-svg" viewBox="0 0 200 120">
+            <defs>
+              <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#10b981"/>
+                <stop offset="50%" style="stop-color:#f59e0b"/>
+                <stop offset="100%" style="stop-color:#ef4444"/>
+              </linearGradient>
+            </defs>
+            <!-- Track -->
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>
+            <!-- Fill (33/75 = 44%) -->
+            <path id="gaugeFill" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round"
+              stroke-dasharray="251.2" stroke-dashoffset="140.7"/>
+            <!-- Needle -->
+            <line id="gaugeNeedle" x1="100" y1="100" x2="100" y2="30" stroke="#06b6d4" stroke-width="2.5" stroke-linecap="round"
+              transform="rotate(-79.2, 100, 100)"/>
+            <circle cx="100" cy="100" r="5" fill="#06b6d4"/>
+            <!-- Labels -->
+            <text x="18" y="118" fill="#64748b" font-size="10" text-anchor="middle">0</text>
+            <text x="100" y="18" fill="#64748b" font-size="10" text-anchor="middle">37</text>
+            <text x="182" y="118" fill="#64748b" font-size="10" text-anchor="middle">75</text>
+          </svg>
+          <div class="gauge-value">33.0</div>
+          <div class="gauge-label">mph · Average Speed</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Distribution + Donut -->
+  <div class="section-label">Speed Distribution</div>
+  <div class="chart-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon icon-green">📊</div>
+          Speed Distribution (mph)
+        </div>
+        <span class="card-badge badge-green">207 readings</span>
+      </div>
+      <div class="chart-container dist-chart">
+        <canvas id="distChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon icon-purple">🍩</div>
+          Speed Category Breakdown
+        </div>
+      </div>
+      <div class="chart-container donut-chart">
+        <canvas id="donutChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cities + Journey Log -->
+  <div class="section-label">Location Intelligence</div>
+  <div class="chart-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon icon-cyan">🏙️</div>
+          Top Cities by Record Count
+        </div>
+      </div>
+      <div id="cityBars"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon icon-red">📋</div>
+          Speed Journey Log
+        </div>
+        <span class="card-badge badge-blue">Latest 50</span>
+      </div>
+      <div class="table-scroll">
+        <table class="journey-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>City</th>
+              <th>Speed</th>
+              <th>Bar</th>
+            </tr>
+          </thead>
+          <tbody id="journeyBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+const speedOverTime = [{"ts":"2026-07-03T12:47:03","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:47:56","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:48:03","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:48:58","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:49:05","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:50:00","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:50:06","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:51:02","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:51:08","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:52:05","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:52:09","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:53:06","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:53:10","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:54:08","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:54:12","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:55:10","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:55:13","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:56:13","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:56:14","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:57:16","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:57:16","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:58:18","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:58:18","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:59:22","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T12:59:22","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:00:23","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:00:23","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:01:26","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:01:26","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:03:50","speed":0.78,"city":"Elk City"},{"ts":"2026-07-03T13:04:52","speed":6.62,"city":"Elk City"},{"ts":"2026-07-03T13:05:57","speed":4.52,"city":"Elk City"},{"ts":"2026-07-03T13:06:59","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:08:03","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:09:05","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:10:08","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:11:09","speed":0.92,"city":"Elk City"},{"ts":"2026-07-03T13:12:13","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:13:15","speed":6.35,"city":"Elk City"},{"ts":"2026-07-03T13:14:17","speed":0.65,"city":"Elk City"},{"ts":"2026-07-03T13:15:19","speed":0.65,"city":"Elk City"},{"ts":"2026-07-03T13:16:21","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:17:23","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:18:27","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:19:29","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:20:31","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:21:34","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:22:38","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:23:41","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:24:44","speed":0.47,"city":"Elk City"},{"ts":"2026-07-03T13:25:21","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:25:45","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:26:48","speed":10.33,"city":"Elk City"},{"ts":"2026-07-03T13:27:49","speed":4.72,"city":"Elk City"},{"ts":"2026-07-03T13:28:52","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:29:52","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:30:54","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:31:56","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:32:58","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:33:59","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:35:01","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:36:02","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:37:04","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:38:06","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:39:07","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:40:08","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:41:10","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:42:12","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:43:13","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:43:13","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:44:15","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:45:17","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:46:19","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:47:21","speed":0.0,"city":"Elk City"},{"ts":"2026-07-03T13:48:23","speed":2.71,"city":"Elk City"},{"ts":"2026-07-03T13:49:25","speed":42.32,"city":"Elk City"},{"ts":"2026-07-03T13:50:27","speed":53.04,"city":"Elk City"},{"ts":"2026-07-03T13:51:44","speed":50.62,"city":"Elk City"},{"ts":"2026-07-03T13:52:45","speed":41.65,"city":"Elk City"},{"ts":"2026-07-03T13:53:48","speed":52.7,"city":"Elk City"},{"ts":"2026-07-03T13:54:49","speed":60.62,"city":"Elk City"},{"ts":"2026-07-03T13:55:51","speed":68.07,"city":"Elk City"},{"ts":"2026-07-03T13:56:53","speed":70.55,"city":"Elk City"},{"ts":"2026-07-03T13:58:03","speed":72.68,"city":"Canute"},{"ts":"2026-07-03T13:59:05","speed":73.75,"city":"Canute"},{"ts":"2026-07-03T14:00:07","speed":73.21,"city":"Canute"},{"ts":"2026-07-03T14:01:12","speed":70.84,"city":"Canute"},{"ts":"2026-07-03T14:02:14","speed":69.05,"city":"Canute"},{"ts":"2026-07-03T14:03:16","speed":71.43,"city":"Foss"},{"ts":"2026-07-03T14:04:18","speed":74.42,"city":"Foss"},{"ts":"2026-07-03T14:05:20","speed":73.37,"city":"Foss"},{"ts":"2026-07-03T14:06:22","speed":73.68,"city":"Foss"},{"ts":"2026-07-03T14:07:25","speed":73.86,"city":"Foss"},{"ts":"2026-07-03T14:08:28","speed":73.28,"city":"Clinton"},{"ts":"2026-07-03T14:09:29","speed":68.65,"city":"Clinton"},{"ts":"2026-07-03T14:10:32","speed":73.46,"city":"Clinton"},{"ts":"2026-07-03T14:11:34","speed":69.46,"city":"Clinton"},{"ts":"2026-07-03T14:12:38","speed":72.86,"city":"Clinton"},{"ts":"2026-07-03T14:13:39","speed":72.43,"city":"Clinton"},{"ts":"2026-07-03T14:14:42","speed":66.79,"city":"Clinton"},{"ts":"2026-07-03T14:15:44","speed":49.68,"city":"Clinton"},{"ts":"2026-07-03T14:16:46","speed":50.44,"city":"Clinton"},{"ts":"2026-07-03T14:17:48","speed":72.63,"city":"Clinton"},{"ts":"2026-07-03T14:18:49","speed":73.55,"city":"Clinton"},{"ts":"2026-07-03T14:19:52","speed":59.97,"city":"Clinton"},{"ts":"2026-07-03T14:20:54","speed":60.78,"city":"Custer City"},{"ts":"2026-07-03T14:21:56","speed":67.71,"city":"Clinton"},{"ts":"2026-07-03T14:22:57","speed":64.09,"city":"Clinton"},{"ts":"2026-07-03T14:24:00","speed":61.9,"city":"Weatherford"},{"ts":"2026-07-03T14:25:02","speed":59.7,"city":"Weatherford"},{"ts":"2026-07-03T14:27:16","speed":62.01,"city":"Weatherford"},{"ts":"2026-07-03T14:28:18","speed":67.35,"city":"Weatherford"},{"ts":"2026-07-03T14:29:20","speed":57.2,"city":"Weatherford"},{"ts":"2026-07-03T14:30:22","speed":56.84,"city":"Weatherford"},{"ts":"2026-07-03T14:31:24","speed":59.03,"city":"Weatherford"},{"ts":"2026-07-03T14:32:26","speed":66.37,"city":"Weatherford"},{"ts":"2026-07-03T14:33:28","speed":71.4,"city":"Weatherford"},{"ts":"2026-07-03T14:34:29","speed":69.14,"city":"Weatherford"},{"ts":"2026-07-03T14:35:31","speed":68.7,"city":"Hydro"},{"ts":"2026-07-03T14:36:35","speed":71.81,"city":"Hydro"},{"ts":"2026-07-03T14:37:37","speed":71.18,"city":"Hydro"},{"ts":"2026-07-03T14:38:39","speed":72.23,"city":"Hydro"},{"ts":"2026-07-03T14:39:42","speed":65.14,"city":"Hydro"},{"ts":"2026-07-03T14:40:44","speed":68.56,"city":"Hydro"},{"ts":"2026-07-03T14:41:47","speed":72.66,"city":"Hydro"},{"ts":"2026-07-03T14:42:52","speed":72.86,"city":"Hydro"},{"ts":"2026-07-03T14:43:54","speed":65.7,"city":"Hinton"},{"ts":"2026-07-03T14:44:56","speed":73.8,"city":"Hinton"},{"ts":"2026-07-03T14:46:00","speed":72.95,"city":"Hinton"},{"ts":"2026-07-03T14:47:02","speed":64.71,"city":"Hinton"},{"ts":"2026-07-03T14:48:04","speed":72.7,"city":"Hinton"},{"ts":"2026-07-03T14:49:06","speed":32.19,"city":"Hinton"},{"ts":"2026-07-03T14:50:08","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T14:51:10","speed":41.41,"city":"Hinton"},{"ts":"2026-07-03T14:52:12","speed":54.69,"city":"Hinton"},{"ts":"2026-07-03T14:53:14","speed":55.5,"city":"Hinton"},{"ts":"2026-07-03T14:54:15","speed":39.19,"city":"Hinton"},{"ts":"2026-07-03T14:55:17","speed":25.28,"city":"Hinton"},{"ts":"2026-07-03T14:56:19","speed":10.92,"city":"Hinton"},{"ts":"2026-07-03T14:57:22","speed":31.14,"city":"Hinton"},{"ts":"2026-07-03T14:58:24","speed":42.23,"city":"Hinton"},{"ts":"2026-07-03T14:59:28","speed":65.65,"city":"Hinton"},{"ts":"2026-07-03T15:00:30","speed":65.43,"city":"Hinton"},{"ts":"2026-07-03T15:01:32","speed":58.97,"city":"Hinton"},{"ts":"2026-07-03T15:02:34","speed":15.55,"city":"Hinton"},{"ts":"2026-07-03T15:03:41","speed":15.86,"city":"Lookeba"},{"ts":"2026-07-03T15:04:15","speed":23.22,"city":"Hinton"},{"ts":"2026-07-03T15:04:23","speed":20.18,"city":"Hinton"},{"ts":"2026-07-03T15:04:43","speed":11.36,"city":"Hinton"},{"ts":"2026-07-03T15:05:47","speed":5.64,"city":"Hinton"},{"ts":"2026-07-03T15:06:49","speed":0.85,"city":"Hinton"},{"ts":"2026-07-03T15:07:50","speed":0.4,"city":"Hinton"},{"ts":"2026-07-03T15:08:56","speed":0.98,"city":"Hinton"},{"ts":"2026-07-03T15:09:59","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:11:01","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:12:03","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:13:04","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:14:06","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:14:54","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:15:07","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:16:09","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:17:11","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:18:13","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:18:33","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:19:15","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:20:24","speed":25.64,"city":"Hinton"},{"ts":"2026-07-03T15:20:43","speed":25.34,"city":"Hinton"},{"ts":"2026-07-03T15:21:26","speed":14.63,"city":"Hinton"},{"ts":"2026-07-03T15:22:28","speed":19.77,"city":"Lookeba"},{"ts":"2026-07-03T15:23:29","speed":66.46,"city":"Hinton"},{"ts":"2026-07-03T15:24:35","speed":65.41,"city":"Hinton"},{"ts":"2026-07-03T15:25:37","speed":51.67,"city":"Hinton"},{"ts":"2026-07-03T15:26:42","speed":40.87,"city":"Hinton"},{"ts":"2026-07-03T15:27:44","speed":24.99,"city":"Hinton"},{"ts":"2026-07-03T15:28:47","speed":24.29,"city":"Hinton"},{"ts":"2026-07-03T15:29:48","speed":28.34,"city":"Hinton"},{"ts":"2026-07-03T15:30:51","speed":57.58,"city":"Hinton"},{"ts":"2026-07-03T15:31:52","speed":55.1,"city":"Hinton"},{"ts":"2026-07-03T15:32:54","speed":53.8,"city":"Hinton"},{"ts":"2026-07-03T15:33:56","speed":0.0,"city":"Hinton"},{"ts":"2026-07-03T15:34:58","speed":29.51,"city":"Hinton"},{"ts":"2026-07-03T15:36:00","speed":70.84,"city":"Hinton"},{"ts":"2026-07-03T15:37:02","speed":73.35,"city":"Hinton"},{"ts":"2026-07-03T15:38:04","speed":74.15,"city":"Hinton"},{"ts":"2026-07-03T15:39:06","speed":73.06,"city":"Hinton"},{"ts":"2026-07-03T15:40:08","speed":74.31,"city":"Hydro"},{"ts":"2026-07-03T15:41:10","speed":74.13,"city":"Hydro"},{"ts":"2026-07-03T15:42:12","speed":74.53,"city":"Hydro"},{"ts":"2026-07-03T15:43:14","speed":74.31,"city":"Hydro"},{"ts":"2026-07-03T15:44:15","speed":74.49,"city":"Hydro"},{"ts":"2026-07-03T15:45:17","speed":74.18,"city":"Hydro"},{"ts":"2026-07-03T15:46:19","speed":74.15,"city":"Hydro"},{"ts":"2026-07-03T15:47:21","speed":73.08,"city":"Hydro"},{"ts":"2026-07-03T15:48:23","speed":74.15,"city":"Weatherford"},{"ts":"2026-07-03T15:49:25","speed":74.62,"city":"Weatherford"},{"ts":"2026-07-03T15:50:27","speed":71.74,"city":"Weatherford"},{"ts":"2026-07-03T15:51:29","speed":70.51,"city":"Weatherford"},{"ts":"2026-07-03T15:52:31","speed":57.53,"city":"Weatherford"},{"ts":"2026-07-03T15:53:32","speed":68.29,"city":"Weatherford"},{"ts":"2026-07-03T15:54:34","speed":75.16,"city":"Weatherford"},{"ts":"2026-07-03T15:55:37","speed":73.42,"city":"Weatherford"},{"ts":"2026-07-03T15:56:39","speed":73.26,"city":"Weatherford"},{"ts":"2026-07-03T15:57:41","speed":73.98,"city":"Weatherford"},{"ts":"2026-07-03T15:58:43","speed":74.53,"city":"Weatherford"},{"ts":"2026-07-03T15:59:45","speed":73.62,"city":"Clinton"},{"ts":"2026-07-03T16:00:47","speed":73.39,"city":"Clinton"},{"ts":"2026-07-03T16:01:49","speed":74.24,"city":"Custer City"}];
+
+const mapPoints = [{"lat":35.5162481,"lon":-98.90708411,"speed":74.24,"ts":"2026-07-03T16:01:49","city":"Custer City","loc":"U.S. Route 66, Custer City, Oklahoma"},{"lat":35.51632424,"lon":-98.88441661,"speed":73.39,"ts":"2026-07-03T16:00:47","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.51626611,"lon":-98.86169114,"speed":73.62,"ts":"2026-07-03T15:59:45","city":"Clinton","loc":"Interstate 40, Clinton, Oklahoma"},{"lat":35.51911594,"lon":-98.83965343,"speed":74.53,"ts":"2026-07-03T15:58:43","city":"Weatherford","loc":"Interstate 40, Weatherford, Oklahoma"},{"lat":35.52254,"lon":-98.81748014,"speed":73.98,"ts":"2026-07-03T15:57:41","city":"Weatherford","loc":"South Frontage Road, Weatherford, Oklahoma"},{"lat":35.52242254,"lon":-98.79475467,"speed":73.26,"ts":"2026-07-03T15:56:39","city":"Weatherford","loc":"U.S. Route 66, Weatherford, Oklahoma"},{"lat":35.52232882,"lon":-98.77203418,"speed":73.42,"ts":"2026-07-03T15:55:37","city":"Weatherford","loc":"Interstate 40, Weatherford, Oklahoma"},{"lat":35.52231528,"lon":-98.74948277,"speed":75.16,"ts":"2026-07-03T15:54:34","city":"Weatherford","loc":"South Frontage Road, Weatherford, Oklahoma"},{"lat":35.52053116,"lon":-98.72718228,"speed":68.29,"ts":"2026-07-03T15:53:32","city":"Weatherford","loc":"Oklahoma 54, Weatherford, Oklahoma"},{"lat":35.52175797,"lon":-98.70935321,"speed":57.53,"ts":"2026-07-03T15:52:31","city":"Weatherford","loc":"South Broadway Street, Weatherford, Oklahoma"},{"lat":35.52583335,"lon":-98.69122177,"speed":70.51,"ts":"2026-07-03T15:51:29","city":"Weatherford","loc":"East Main Street, Weatherford, Oklahoma"},{"lat":35.53642896,"lon":-98.67483673,"speed":71.74,"ts":"2026-07-03T15:50:27","city":"Weatherford","loc":"East Main Street, Weatherford, Oklahoma"},{"lat":35.5364895,"lon":-98.65256605,"speed":74.62,"ts":"2026-07-03T15:49:25","city":"Weatherford","loc":"East Main Street, Weatherford, Oklahoma"},{"lat":35.53651121,"lon":-98.63007387,"speed":74.15,"ts":"2026-07-03T15:48:23","city":"Weatherford","loc":"Interstate 40, Weatherford, Oklahoma"},{"lat":35.53652131,"lon":-98.60733445,"speed":73.08,"ts":"2026-07-03T15:47:21","city":"Hydro","loc":"Hydro Heights Road, Hydro, Oklahoma"},{"lat":35.5364868,"lon":-98.58476322,"speed":74.15,"ts":"2026-07-03T15:46:19","city":"Hydro","loc":"Old 66 Road, Hydro, Oklahoma"},{"lat":35.53654654,"lon":-98.56211604,"speed":74.18,"ts":"2026-07-03T15:45:17","city":"Hydro","loc":"Old 66 Road, Hydro, Oklahoma"},{"lat":35.53319531,"lon":-98.54016548,"speed":74.49,"ts":"2026-07-03T15:44:15","city":"Hydro","loc":"Interstate 40, Hydro, Oklahoma"},{"lat":35.52963781,"lon":-98.51792582,"speed":74.31,"ts":"2026-07-03T15:43:14","city":"Hydro","loc":"Interstate 40, Hydro, Oklahoma"},{"lat":35.52960188,"lon":-98.49548868,"speed":74.53,"ts":"2026-07-03T15:42:12","city":"Hydro","loc":"Interstate 40, Hydro, Oklahoma"},{"lat":35.52947382,"lon":-98.47268901,"speed":74.13,"ts":"2026-07-03T15:41:10","city":"Hydro","loc":"Interstate 40, Hydro, Oklahoma"},{"lat":35.52968978,"lon":-98.45006282,"speed":74.31,"ts":"2026-07-03T15:40:08","city":"Hydro","loc":"Interstate 40, Hydro, Oklahoma"},{"lat":35.52948527,"lon":-98.42738332,"speed":73.06,"ts":"2026-07-03T15:39:06","city":"Hinton","loc":"Interstate 40, Hinton, Oklahoma"},{"lat":35.52974083,"lon":-98.40487986,"speed":74.15,"ts":"2026-07-03T15:38:04","city":"Hinton","loc":"Interstate 40, Hinton, Oklahoma"},{"lat":35.52936331,"lon":-98.38223381,"speed":73.35,"ts":"2026-07-03T15:37:02","city":"Hinton","loc":"Interstate 40, Hinton, Oklahoma"},{"lat":35.52930831,"lon":-98.35959599,"speed":70.84,"ts":"2026-07-03T15:36:00","city":"Hinton","loc":"Interstate 40, Hinton, Oklahoma"},{"lat":35.40636924,"lon":-98.37583801,"speed":14.63,"ts":"2026-07-03T15:21:26","city":"Hinton","loc":"East 1110 Road, Hinton, Oklahoma"},{"lat":35.41838117,"lon":-98.36420181,"speed":66.46,"ts":"2026-07-03T15:23:29","city":"Hinton","loc":"U.S. 281, Hinton, Oklahoma"},{"lat":35.43376829,"lon":-98.35908171,"speed":65.41,"ts":"2026-07-03T15:24:35","city":"Hinton","loc":"Oklahoma 8, Hinton, Oklahoma"},{"lat":35.45002885,"lon":-98.35921094,"speed":51.67,"ts":"2026-07-03T15:25:37","city":"Hinton","loc":"Oklahoma 8, Hinton, Oklahoma"},{"lat":35.46079951,"lon":-98.358968,"speed":40.87,"ts":"2026-07-03T15:26:42","city":"Hinton","loc":"South Broadway Avenue, Hinton, Oklahoma"},{"lat":35.46874777,"lon":-98.35553102,"speed":24.99,"ts":"2026-07-03T15:27:44","city":"Hinton","loc":"South Broadway Avenue, Hinton, Oklahoma"},{"lat":35.47295648,"lon":-98.35544732,"speed":24.29,"ts":"2026-07-03T15:28:47","city":"Hinton","loc":"North Broadway Street, Hinton, Oklahoma"},{"lat":35.47950264,"lon":-98.35453822,"speed":28.34,"ts":"2026-07-03T15:29:48","city":"Hinton","loc":"North Broadway Street, Hinton, Oklahoma"},{"lat":35.48960046,"lon":-98.35044427,"speed":57.58,"ts":"2026-07-03T15:30:51","city":"Hinton","loc":"North Broadway Boulevard, Hinton, Oklahoma"},{"lat":35.5034021,"lon":-98.35032469,"speed":55.1,"ts":"2026-07-03T15:31:52","city":"Hinton","loc":"Broadway, Hinton, Oklahoma"},{"lat":35.51692912,"lon":-98.35054618,"speed":53.8,"ts":"2026-07-03T15:32:54","city":"Hinton","loc":"Broadway, Hinton, Oklahoma"},{"lat":35.52684384,"lon":-98.35059632,"speed":29.51,"ts":"2026-07-03T15:34:58","city":"Hinton","loc":"North Broadway Street, Hinton, Oklahoma"},{"lat":35.47988467,"lon":-99.04535998,"speed":72.86,"ts":"2026-07-03T14:12:38","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.48003108,"lon":-99.0893008,"speed":73.46,"ts":"2026-07-03T14:10:32","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.4735118,"lon":-99.12970822,"speed":73.28,"ts":"2026-07-03T14:08:28","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.46137333,"lon":-99.14712524,"speed":64.09,"ts":"2026-07-03T14:22:57","city":"Clinton","loc":"Interstate 40, Clinton, Oklahoma"},{"lat":35.50017474,"lon":-98.95837406,"speed":72.63,"ts":"2026-07-03T14:17:48","city":"Clinton","loc":"South Glenn Smith Road, Clinton, Oklahoma"},{"lat":35.50494812,"lon":-98.93769204,"speed":73.55,"ts":"2026-07-03T14:18:49","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.51360063,"lon":-98.91915919,"speed":59.97,"ts":"2026-07-03T14:19:52","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.51609074,"lon":-98.90278919,"speed":60.78,"ts":"2026-07-03T14:20:54","city":"Custer City","loc":"U.S. Route 66, Custer City, Oklahoma"},{"lat":35.5161411,"lon":-98.88168778,"speed":67.71,"ts":"2026-07-03T14:21:56","city":"Clinton","loc":"North Frontage Road, Clinton, Oklahoma"},{"lat":35.51829189,"lon":-98.84214283,"speed":61.9,"ts":"2026-07-03T14:24:00","city":"Weatherford","loc":"Interstate 40, Weatherford, Oklahoma"},{"lat":35.52213323,"lon":-98.82439235,"speed":59.7,"ts":"2026-07-03T14:25:02","city":"Weatherford","loc":"Interstate 40, Weatherford, Oklahoma"},{"lat":35.52220053,"lon":-98.78253633,"speed":62.01,"ts":"2026-07-03T14:27:16","city":"Weatherford","loc":"Interstate 40, Weatherford, Oklahoma"},{"lat":35.52210492,"lon":-98.76156983,"speed":67.35,"ts":"2026-07-03T14:28:18","city":"Weatherford","loc":"Interstate 40, Weatherford, Oklahoma"},{"lat":35.52208917,"lon":-98.74164415,"speed":57.2,"ts":"2026-07-03T14:29:20","city":"Weatherford","loc":"Interstate 40, Weatherford, Oklahoma"},{"lat":35.52018556,"lon":-98.72463744,"speed":56.84,"ts":"2026-07-03T14:30:22","city":"Weatherford","loc":"Interstate 40, Weatherford, Oklahoma"},{"lat":35.52154522,"lon":-98.7080972,"speed":59.03,"ts":"2026-07-03T14:31:24","city":"Weatherford","loc":"South Custer Street, Weatherford, Oklahoma"},{"lat":35.52688879,"lon":-98.68988012,"speed":66.37,"ts":"2026-07-03T14:32:26","city":"Weatherford","loc":"East Main Street, Weatherford, Oklahoma"},{"lat":35.53626824,"lon":-98.6726957,"speed":71.4,"ts":"2026-07-03T14:33:28","city":"Weatherford","loc":"East Main Street, Weatherford, Oklahoma"},{"lat":35.53628409,"lon":-98.65098796,"speed":69.14,"ts":"2026-07-03T14:34:29","city":"Weatherford","loc":"South Frontage Road, Weatherford, Oklahoma"},{"lat":35.53627848,"lon":-98.62902397,"speed":68.7,"ts":"2026-07-03T14:35:31","city":"Hydro","loc":"South Frontage Road, Hydro, Oklahoma"},{"lat":35.53629186,"lon":-98.60699188,"speed":71.81,"ts":"2026-07-03T14:36:35","city":"Hydro","loc":"Hydro Heights Road, Hydro, Oklahoma"},{"lat":35.53629858,"lon":-98.58467616,"speed":71.18,"ts":"2026-07-03T14:37:37","city":"Hydro","loc":"Old 66 Road, Hydro, Oklahoma"},{"lat":35.53631197,"lon":-98.56195216,"speed":72.23,"ts":"2026-07-03T14:38:39","city":"Hydro","loc":"County Road 1022, Hydro, Oklahoma"},{"lat":35.53312761,"lon":-98.54103834,"speed":65.14,"ts":"2026-07-03T14:39:42","city":"Hydro","loc":"Interstate 40, Hydro, Oklahoma"},{"lat":35.52938727,"lon":-98.52170032,"speed":68.56,"ts":"2026-07-03T14:40:44","city":"Hydro","loc":"Interstate 40, Hydro, Oklahoma"},{"lat":35.52942654,"lon":-98.49967314,"speed":72.66,"ts":"2026-07-03T14:41:47","city":"Hydro","loc":"Interstate 40, Hydro, Oklahoma"},{"lat":35.52939448,"lon":-98.47848673,"speed":72.86,"ts":"2026-07-03T14:42:52","city":"Hydro","loc":"Interstate 40, Hydro, Oklahoma"},{"lat":35.52909603,"lon":-98.45752076,"speed":65.7,"ts":"2026-07-03T14:43:54","city":"Hinton","loc":"Interstate 40, Hinton, Oklahoma"},{"lat":35.5290846,"lon":-98.43620527,"speed":73.8,"ts":"2026-07-03T14:44:56","city":"Hinton","loc":"Interstate 40, Hinton, Oklahoma"},{"lat":35.52925238,"lon":-98.41378822,"speed":72.95,"ts":"2026-07-03T14:46:00","city":"Hinton","loc":"Interstate 40, Hinton, Oklahoma"},{"lat":35.52920558,"lon":-98.393671,"speed":64.71,"ts":"2026-07-03T14:47:02","city":"Hinton","loc":"Interstate 40, Hinton, Oklahoma"},{"lat":35.52916182,"lon":-98.37230262,"speed":72.7,"ts":"2026-07-03T14:48:04","city":"Hinton","loc":"Interstate 40, Hinton, Oklahoma"},{"lat":35.52880192,"lon":-98.35291471,"speed":32.19,"ts":"2026-07-03T14:49:06","city":"Hinton","loc":"North Broadway Street, Hinton, Oklahoma"},{"lat":35.44518238,"lon":-98.35919422,"speed":65.65,"ts":"2026-07-03T14:59:28","city":"Hinton","loc":"Oklahoma 8, Hinton, Oklahoma"},{"lat":35.45798581,"lon":-98.35927718,"speed":42.23,"ts":"2026-07-03T14:58:24","city":"Hinton","loc":"Oklahoma 8, Hinton, Oklahoma"},{"lat":35.46582839,"lon":-98.35578995,"speed":31.14,"ts":"2026-07-03T14:57:22","city":"Hinton","loc":"South Broadway Avenue, Hinton, Oklahoma"},{"lat":35.47140791,"lon":-98.35560796,"speed":10.92,"ts":"2026-07-03T14:56:19","city":"Hinton","loc":"East Main Street, Hinton, Oklahoma"},{"lat":35.47612947,"lon":-98.35551291,"speed":25.28,"ts":"2026-07-03T14:55:17","city":"Hinton","loc":"2nd Street, Hinton, Oklahoma"},{"lat":35.48270043,"lon":-98.35187394,"speed":39.19,"ts":"2026-07-03T14:54:15","city":"Hinton","loc":"Broadway, Hinton, Oklahoma"},{"lat":35.49502314,"lon":-98.35046539,"speed":55.5,"ts":"2026-07-03T14:53:14","city":"Hinton","loc":"North Broadway Boulevard, Hinton, Oklahoma"},{"lat":35.50885594,"lon":-98.35059313,"speed":54.69,"ts":"2026-07-03T14:52:12","city":"Hinton","loc":"North Broadway Street, Hinton, Oklahoma"},{"lat":35.52124169,"lon":-98.35069424,"speed":41.41,"ts":"2026-07-03T14:51:10","city":"Hinton","loc":"North Broadway Street, Hinton, Oklahoma"},{"lat":35.42878329,"lon":-98.359303,"speed":65.43,"ts":"2026-07-03T15:00:30","city":"Hinton","loc":"Oklahoma 8, Hinton, Oklahoma"},{"lat":35.41499668,"lon":-98.36705896,"speed":58.97,"ts":"2026-07-03T15:01:32","city":"Hinton","loc":"U.S. 281, Hinton, Oklahoma"},{"lat":35.40631369,"lon":-98.37315237,"speed":15.55,"ts":"2026-07-03T15:02:34","city":"Hinton","loc":"County Road 1110, Hinton, Oklahoma"},{"lat":35.40636644,"lon":-98.37798271,"speed":15.86,"ts":"2026-07-03T15:03:41","city":"Lookeba","loc":"County Road 1110, Lookeba, Oklahoma"},{"lat":35.4067486,"lon":-98.3723935,"speed":19.77,"ts":"2026-07-03T15:22:28","city":"Lookeba","loc":"U.S. 281, Lookeba, Oklahoma"},{"lat":35.46137333,"lon":-99.14712524,"speed":64.09,"ts":"2026-07-03T14:22:57","city":"Clinton","loc":"Interstate 40, Clinton, Oklahoma"},{"lat":35.47988467,"lon":-99.04535998,"speed":72.86,"ts":"2026-07-03T14:12:38","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.48010233,"lon":-99.10949417,"speed":68.65,"ts":"2026-07-03T14:09:29","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.48092464,"lon":-99.02339804,"speed":72.43,"ts":"2026-07-03T14:13:39","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.48003108,"lon":-99.0893008,"speed":73.46,"ts":"2026-07-03T14:10:32","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.47993485,"lon":-99.06688006,"speed":69.46,"ts":"2026-07-03T14:11:34","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.49034632,"lon":-99.00600385,"speed":66.79,"ts":"2026-07-03T14:14:42","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.49633684,"lon":-98.99136994,"speed":49.68,"ts":"2026-07-03T14:15:44","city":"Clinton","loc":"Lombardy Place, Clinton, Oklahoma"},{"lat":35.49915316,"lon":-98.97642132,"speed":50.44,"ts":"2026-07-03T14:16:46","city":"Clinton","loc":"U.S. Route 66, Clinton, Oklahoma"},{"lat":35.46137333,"lon":-99.14712524,"speed":64.09,"ts":"2026-07-03T14:22:57","city":"Clinton","loc":"Interstate 40, Clinton, Oklahoma"},{"lat":35.46137333,"lon":-99.14712524,"speed":71.43,"ts":"2026-07-03T14:03:16","city":"Foss","loc":"Foss, Oklahoma"},{"lat":35.46137333,"lon":-99.14712524,"speed":74.42,"ts":"2026-07-03T14:04:18","city":"Foss","loc":"Foss, Oklahoma"},{"lat":35.46137333,"lon":-99.14712524,"speed":73.37,"ts":"2026-07-03T14:05:20","city":"Foss","loc":"Foss, Oklahoma"},{"lat":35.46137333,"lon":-99.14712524,"speed":73.68,"ts":"2026-07-03T14:06:22","city":"Foss","loc":"Foss, Oklahoma"},{"lat":35.46137333,"lon":-99.14712524,"speed":73.86,"ts":"2026-07-03T14:07:25","city":"Foss","loc":"Foss, Oklahoma"},{"lat":35.5162481,"lon":-98.90708411,"speed":72.68,"ts":"2026-07-03T13:58:03","city":"Canute","loc":"Canute, Oklahoma"},{"lat":35.5162481,"lon":-98.90708411,"speed":73.75,"ts":"2026-07-03T13:59:05","city":"Canute","loc":"Canute, Oklahoma"},{"lat":35.5162481,"lon":-98.90708411,"speed":73.21,"ts":"2026-07-03T14:00:07","city":"Canute","loc":"Canute, Oklahoma"},{"lat":35.5162481,"lon":-98.90708411,"speed":70.84,"ts":"2026-07-03T14:01:12","city":"Canute","loc":"Canute, Oklahoma"},{"lat":35.5162481,"lon":-98.90708411,"speed":69.05,"ts":"2026-07-03T14:02:14","city":"Canute","loc":"Canute, Oklahoma"},{"lat":35.5162481,"lon":-99.40708411,"speed":42.32,"ts":"2026-07-03T13:49:25","city":"Elk City","loc":"Elk City, Oklahoma"},{"lat":35.5162481,"lon":-99.40708411,"speed":53.04,"ts":"2026-07-03T13:50:27","city":"Elk City","loc":"Elk City, Oklahoma"},{"lat":35.5162481,"lon":-99.40708411,"speed":50.62,"ts":"2026-07-03T13:51:44","city":"Elk City","loc":"Elk City, Oklahoma"},{"lat":35.5162481,"lon":-99.40708411,"speed":41.65,"ts":"2026-07-03T13:52:45","city":"Elk City","loc":"Elk City, Oklahoma"},{"lat":35.5162481,"lon":-99.40708411,"speed":52.7,"ts":"2026-07-03T13:53:48","city":"Elk City","loc":"Elk City, Oklahoma"},{"lat":35.5162481,"lon":-99.40708411,"speed":60.62,"ts":"2026-07-03T13:54:49","city":"Elk City","loc":"Elk City, Oklahoma"},{"lat":35.5162481,"lon":-99.40708411,"speed":68.07,"ts":"2026-07-03T13:55:51","city":"Elk City","loc":"Elk City, Oklahoma"},{"lat":35.5162481,"lon":-99.40708411,"speed":70.55,"ts":"2026-07-03T13:56:53","city":"Elk City","loc":"Elk City, Oklahoma"}];
+
+const topCities = [["Elk City",2313],["Leedey",1252],["Hammon",1202],["Camargo",891],["Weatherford",445],["Butler",416],["Hydro",257],["Clinton",252],["Hinton",198],["Arapaho",176],["Eakly",145],["Gotebo",134]];
+const dist = {"0-10":92,"10-20":7,"20-30":9,"30-40":3,"40-50":6,"50-60":17,"60-70":24,"70-80":49};
+const hourlyAvg = {12:0.0,13:10.41,14:61.72,15:40.43,16:73.81};
+
+// ─── CHART DEFAULTS ──────────────────────────────────────────────────────────
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = '#1e293b';
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+
+// ─── SPEED TIMELINE ──────────────────────────────────────────────────────────
+const timeLabels = speedOverTime.map(d => {
+  const t = new Date(d.ts);
+  return `${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}`;
+});
+const timeValues = speedOverTime.map(d => d.speed);
+
+const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+const gradTimeline = timelineCtx.createLinearGradient(0, 0, 0, 220);
+gradTimeline.addColorStop(0, 'rgba(59,130,246,0.35)');
+gradTimeline.addColorStop(1, 'rgba(59,130,246,0.0)');
+
+new Chart(timelineCtx, {
+  type: 'line',
+  data: {
+    labels: timeLabels,
+    datasets: [{
+      label: 'Speed (mph)',
+      data: timeValues,
+      borderColor: '#3b82f6',
+      backgroundColor: gradTimeline,
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      pointHoverBackgroundColor: '#3b82f6',
+      tension: 0.4,
+      fill: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#f1f5f9',
+        bodyColor: '#94a3b8',
+        padding: 10,
+        callbacks: {
+          title: (items) => {
+            const idx = items[0].dataIndex;
+            return `${timeLabels[idx]} — ${speedOverTime[idx].city}`;
+          },
+          label: (item) => ` Speed: ${item.raw.toFixed(1)} mph`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.5)' },
+        ticks: {
+          maxTicksLimit: 12,
+          color: '#64748b',
+          font: { size: 10 }
+        }
+      },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.5)' },
+        ticks: { color: '#64748b', font: { size: 10 } },
+        min: 0,
+        max: 80,
+        title: { display: true, text: 'mph', color: '#64748b', font: { size: 10 } }
+      }
+    }
+  }
+});
+
+// ─── HOURLY CHART ────────────────────────────────────────────────────────────
+const hourlyCtx = document.getElementById('hourlyChart').getContext('2d');
+const hourLabels = Object.keys(hourlyAvg).sort().map(h => `${h}:00`);
+const hourValues = Object.keys(hourlyAvg).sort().map(h => hourlyAvg[h]);
+const hourColors = hourValues.map(v => v < 20 ? '#10b981' : v < 50 ? '#f59e0b' : '#ef4444');
+
+new Chart(hourlyCtx, {
+  type: 'bar',
+  data: {
+    labels: hourLabels,
+    datasets: [{
+      label: 'Avg Speed (mph)',
+      data: hourValues,
+      backgroundColor: hourColors,
+      borderRadius: 6,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#f1f5f9',
+        bodyColor: '#94a3b8',
+        padding: 10,
+        callbacks: { label: (item) => ` Avg: ${item.raw.toFixed(1)} mph` }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.5)' },
+        ticks: { color: '#64748b', font: { size: 10 } },
+        min: 0, max: 80
+      }
+    }
+  }
+});
+
+// ─── DISTRIBUTION CHART ──────────────────────────────────────────────────────
+const distCtx = document.getElementById('distChart').getContext('2d');
+const distLabels = Object.keys(dist);
+const distValues = Object.values(dist);
+const distColors = ['#64748b','#94a3b8','#10b981','#34d399','#f59e0b','#fb923c','#ef4444','#dc2626'];
+
+new Chart(distCtx, {
+  type: 'bar',
+  data: {
+    labels: distLabels,
+    datasets: [{
+      label: 'Count',
+      data: distValues,
+      backgroundColor: distColors,
+      borderRadius: 6,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#f1f5f9',
+        bodyColor: '#94a3b8',
+        padding: 10,
+        callbacks: {
+          label: (item) => ` ${item.raw} readings (${((item.raw/207)*100).toFixed(1)}%)`
+        }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.5)' },
+        ticks: { color: '#64748b', font: { size: 10 } }
+      }
+    }
+  }
+});
+
+// ─── DONUT CHART ─────────────────────────────────────────────────────────────
+const donutCtx = document.getElementById('donutChart').getContext('2d');
+const stopped = dist['0-10'];
+const slow = dist['10-20'] + dist['20-30'] + dist['30-40'];
+const medium = dist['40-50'] + dist['50-60'];
+const fast = dist['60-70'] + dist['70-80'];
+
+new Chart(donutCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Stopped / Crawl (0–10)', 'Slow (10–40)', 'Medium (40–60)', 'Fast (60–80)'],
+    datasets: [{
+      data: [stopped, slow, medium, fast],
+      backgroundColor: ['#475569','#10b981','#f59e0b','#ef4444'],
+      borderColor: '#1a2235',
+      borderWidth: 3,
+      hoverOffset: 8
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#94a3b8',
+          font: { size: 10 },
+          padding: 10,
+          boxWidth: 12,
+          boxHeight: 12
+        }
+      },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#f1f5f9',
+        bodyColor: '#94a3b8',
+        padding: 10,
+        callbacks: {
+          label: (item) => ` ${item.raw} readings (${((item.raw/207)*100).toFixed(1)}%)`
+        }
+      }
+    }
+  }
+});
+
+// ─── MAP ─────────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([35.52, -98.7], 9);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+function speedColor(s) {
+  if (s === 0) return '#475569';
+  if (s < 20) return '#10b981';
+  if (s < 40) return '#34d399';
+  if (s < 60) return '#f59e0b';
+  if (s < 70) return '#fb923c';
+  return '#ef4444';
+}
+
+// Draw route polyline
+const routeCoords = mapPoints
+  .sort((a,b) => a.ts.localeCompare(b.ts))
+  .map(p => [p.lat, p.lon]);
+
+L.polyline(routeCoords, {
+  color: 'rgba(59,130,246,0.4)',
+  weight: 2,
+  dashArray: '4 4'
+}).addTo(map);
+
+// Add markers
+mapPoints.forEach(p => {
+  const color = speedColor(p.speed);
+  const t = new Date(p.ts);
+  const timeStr = `${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}`;
+
+  const marker = L.circleMarker([p.lat, p.lon], {
+    radius: p.speed > 60 ? 7 : p.speed > 20 ? 5 : 4,
+    fillColor: color,
+    color: 'rgba(0,0,0,0.3)',
+    weight: 1,
+    opacity: 1,
+    fillOpacity: 0.85
+  }).addTo(map);
+
+  marker.bindPopup(`
+    <div style="min-width:180px;">
+      <div style="font-weight:700; font-size:0.9rem; margin-bottom:6px; color:#f1f5f9;">${p.city}</div>
+      <div style="color:#94a3b8; font-size:0.78rem; margin-bottom:8px;">${p.loc}</div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span style="color:#64748b;">Speed</span>
+        <span style="color:${color}; font-weight:700;">${p.speed.toFixed(1)} mph</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:#64748b;">Time</span>
+        <span style="color:#94a3b8;">${timeStr}</span>
+      </div>
+    </div>
+  `);
+});
+
+// Legend
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = () => {
+  const div = L.DomUtil.create('div');
+  div.style.cssText = 'background:rgba(26,34,53,0.95);border:1px solid #1e293b;border-radius:8px;padding:10px 12px;font-size:11px;color:#94a3b8;';
+  div.innerHTML = `
+    <div style="font-weight:600;color:#f1f5f9;margin-bottom:6px;">Speed (mph)</div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="width:10px;height:10px;border-radius:50%;background:#475569;display:inline-block;"></span> Stopped</div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block;"></span> 1–20</div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;display:inline-block;"></span> 20–60</div>
+    <div style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span> 60+</div>
+  `;
+  return div;
+};
+legend.addTo(map);
+
+// ─── CITY BARS ───────────────────────────────────────────────────────────────
+const maxCity = topCities[0][1];
+const cityColors = ['#3b82f6','#06b6d4','#10b981','#8b5cf6','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316','#a855f7','#22c55e','#64748b'];
+const cityContainer = document.getElementById('cityBars');
+
+topCities.forEach(([name, count], i) => {
+  const pct = (count / maxCity * 100).toFixed(1);
+  const row = document.createElement('div');
+  row.className = 'city-bar-row';
+  row.innerHTML = `
+    <div class="city-name">${name}</div>
+    <div class="city-bar-track">
+      <div class="city-bar-fill" style="width:0%;background:${cityColors[i]};" data-width="${pct}"></div>
+    </div>
+    <div class="city-count">${count.toLocaleString()}</div>
+  `;
+  cityContainer.appendChild(row);
+});
+
+// Animate bars
+setTimeout(() => {
+  document.querySelectorAll('.city-bar-fill').forEach(el => {
+    el.style.width = el.dataset.width + '%';
+  });
+}, 300);
+
+// ─── JOURNEY TABLE ───────────────────────────────────────────────────────────
+const tbody = document.getElementById('journeyBody');
+const recent = [...speedOverTime].reverse().slice(0, 50);
+
+recent.forEach(d => {
+  const t = new Date(d.ts);
+  const timeStr = `${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}`;
+  const s = d.speed;
+  let pillClass, label;
+  if (s === 0) { pillClass = 'speed-stopped'; label = 'Stopped'; }
+  else if (s < 20) { pillClass = 'speed-slow'; label = `${s.toFixed(1)}`; }
+  else if (s < 60) { pillClass = 'speed-medium'; label = `${s.toFixed(1)}`; }
+  else { pillClass = 'speed-fast'; label = `${s.toFixed(1)}`; }
+
+  const barPct = (s / 75 * 100).toFixed(0);
+  const barColor = s === 0 ? '#475569' : s < 20 ? '#10b981' : s < 60 ? '#f59e0b' : '#ef4444';
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td style="color:var(--text-muted);font-size:0.78rem;">${timeStr}</td>
+    <td>${d.city}</td>
+    <td><span class="speed-pill ${pillClass}">${s === 0 ? 'Stopped' : s.toFixed(1) + ' mph'}</span></td>
+    <td>
+      <div class="speed-bar">
+        <div class="speed-bar-track">
+          <div class="speed-bar-fill" style="width:${barPct}%;background:${barColor};"></div>
+        </div>
+      </div>
+    </td>
+  `;
+  tbody.appendChild(tr);
+});
+</script>
+</body>
+</html>
