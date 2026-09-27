@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NFC Toolkit</title>
+<style>
+  :root{
+    --bg:#f5f5f7; --surface:#ffffff; --text:#1a1a1e; --muted:#6b6b75;
+    --border:#e2e2e7; --accent:#3b5bfd; --accent-text:#ffffff;
+    --good:#1f9d55; --bad:#d92d20; --mono:'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#121214; --surface:#1c1c1f; --text:#f2f2f4; --muted:#9a9aa2;
+      --border:#2c2c31; --accent:#6c85ff; --accent-text:#0b0b0d;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#121214; --surface:#1c1c1f; --text:#f2f2f4; --muted:#9a9aa2;
+    --border:#2c2c31; --accent:#6c85ff; --accent-text:#0b0b0d;
+  }
+  html{scroll-padding-top:env(safe-area-inset-top,0px); height:100%;}
+  *{box-sizing:border-box;}
+  body{
+    margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .wrap{ width:100%; max-width:560px; padding:20px 16px 40px; }
+  header{ padding:8px 0 20px; }
+  h1{ font-size:1.4rem; margin:0 0 4px; }
+  .sub{ color:var(--muted); font-size:0.9rem; }
+
+  .card{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:14px; padding:18px; margin-bottom:16px;
+  }
+  .card h2{ font-size:1rem; margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+  .status{
+    display:flex; align-items:center; gap:8px; font-size:0.9rem; margin-bottom:14px;
+    padding:10px 12px; border-radius:10px; background:var(--bg); border:1px solid var(--border);
+  }
+  .dot{ width:9px; height:9px; border-radius:50%; background:var(--muted); flex-shrink:0;}
+  .dot.ok{ background:var(--good);}
+  .dot.err{ background:var(--bad);}
+
+  button{
+    font-size:0.95rem; font-weight:600; border:none; border-radius:10px;
+    padding:12px 16px; cursor:pointer; width:100%;
+    background:var(--accent); color:var(--accent-text);
+  }
+  button.secondary{ background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button:disabled{ opacity:0.45; cursor:not-allowed; }
+  button + button{ margin-top:10px; }
+
+  textarea, input[type=text], select{
+    width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--border);
+    background:var(--bg); color:var(--text); font-size:0.95rem; font-family:inherit;
+    margin-bottom:10px; resize:vertical;
+  }
+  label{ font-size:0.8rem; color:var(--muted); display:block; margin-bottom:6px; }
+
+  .log{
+    font-family:var(--mono); font-size:0.8rem; background:var(--bg);
+    border:1px solid var(--border); border-radius:10px; padding:10px;
+    max-height:220px; overflow-y:auto; white-space:pre-wrap; word-break:break-word;
+  }
+  .log .entry{ padding:6px 0; border-bottom:1px dashed var(--border); }
+  .log .entry:last-child{ border-bottom:none; }
+  .log .k{ color:var(--accent); }
+  .log-empty{ color:var(--muted); font-style:italic; }
+
+  .tabs{ display:flex; gap:8px; margin-bottom:14px; }
+  .tab{
+    flex:1; text-align:center; padding:8px; border-radius:8px; font-size:0.85rem;
+    font-weight:600; cursor:pointer; border:1px solid var(--border); color:var(--muted);
+  }
+  .tab.active{ background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+  footer{ text-align:center; color:var(--muted); font-size:0.75rem; padding-top:10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📡 NFC Toolkit</h1>
+    <div class="sub">Read, write and edit NFC tags from the browser</div>
+  </header>
+
+  <div class="card">
+    <div class="status" id="statusRow">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">Checking Web NFC support…</span>
+    </div>
+    <button id="scanBtn" disabled>Start scanning</button>
+    <button id="stopBtn" class="secondary" style="display:none;">Stop scanning</button>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" data-tab="text">Write Text</div>
+      <div class="tab" data-tab="url">Write URL</div>
+    </div>
+
+    <div class="panel active" id="panel-text">
+      <label for="textInput">Text to write to tag</label>
+      <textarea id="textInput" rows="3" placeholder="Hello from NFC Toolkit"></textarea>
+    </div>
+    <div class="panel" id="panel-url">
+      <label for="urlInput">URL to write to tag</label>
+      <input type="text" id="urlInput" placeholder="https://example.com">
+    </div>
+
+    <button id="writeBtn" disabled>Tap tag to write</button>
+  </div>
+
+  <div class="card">
+    <h2>Scan log</h2>
+    <div class="log" id="log"><div class="log-empty">No reads yet. Start scanning and tap a tag.</div></div>
+  </div>
+
+  <footer>Web NFC requires Chrome for Android over HTTPS. It is not supported on iOS, desktop Chrome, or other browsers.</footer>
+</div>
+
+<script>
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const scanBtn = document.getElementById('scanBtn');
+const stopBtn = document.getElementById('stopBtn');
+const writeBtn = document.getElementById('writeBtn');
+const logEl = document.getElementById('log');
+const textInput = document.getElementById('textInput');
+const urlInput = document.getElementById('urlInput');
+
+let mode = 'text';
+let reader = null;
+let scanning = false;
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    mode = tab.dataset.tab;
+    document.getElementById('panel-'+mode).classList.add('active');
+  });
+});
+
+function setStatus(state, msg){
+  statusDot.className = 'dot' + (state ? ' '+state : '');
+  statusText.textContent = msg;
+}
+
+function logEntry(kind, data){
+  if (logEl.querySelector('.log-empty')) logEl.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'entry';
+  const time = new Date().toLocaleTimeString();
+  div.innerHTML = '<span class="k">['+time+' · '+kind+']</span> ' + data;
+  logEl.prepend(div);
+}
+
+function decodeRecord(record){
+  try{
+    if (record.recordType === 'text'){
+      const decoder = new TextDecoder(record.encoding || 'utf-8');
+      return 'Text: "' + decoder.decode(record.data) + '" (lang: ' + (record.lang||'—') + ')';
+    }
+    if (record.recordType === 'url'){
+      const decoder = new TextDecoder();
+      return 'URL: ' + decoder.decode(record.data);
+    }
+    const decoder = new TextDecoder();
+    let preview;
+    try { preview = decoder.decode(record.data); } catch(e){ preview = '[binary data]'; }
+    return record.recordType + ' (' + (record.mediaType||'unknown') + '): ' + preview;
+  }catch(e){
+    return record.recordType + ': [could not decode]';
+  }
+}
+
+async function init(){
+  if (!('NDEFReader' in window)){
+    setStatus('err', 'Web NFC not supported in this browser. Use Chrome for Android over HTTPS.');
+    return;
+  }
+  setStatus('', 'Web NFC available. Tap "Start scanning" to begin.');
+  scanBtn.disabled = false;
+  writeBtn.disabled = false;
+}
+
+scanBtn.addEventListener('click', async ()=>{
+  try{
+    reader = new NDEFReader();
+    await reader.scan();
+    scanning = true;
+    setStatus('ok', 'Scanning… hold a tag near your device.');
+    scanBtn.style.display = 'none';
+    stopBtn.style.display = 'block';
+
+    reader.onreading = (event)=>{
+      const serial = event.serialNumber || 'unknown';
+      if (event.message.records.length === 0){
+        logEntry('READ', 'Serial: '+serial+' — tag is empty.');
+        return;
+      }
+      event.message.records.forEach(record=>{
+        logEntry('READ', 'Serial: '+serial+' — '+decodeRecord(record));
+      });
+    };
+    reader.onreadingerror = ()=>{
+      logEntry('ERROR', 'Could not read tag — try again.');
+    };
+  }catch(err){
+    setStatus('err', 'Scan failed: ' + err.message);
+    logEntry('ERROR', err.message);
+  }
+});
+
+stopBtn.addEventListener('click', ()=>{
+  // Web NFC has no explicit stop; controller abort pattern recommended for production use.
+  scanning = false;
+  setStatus('', 'Scanning stopped. Tap "Start scanning" to resume.');
+  scanBtn.style.display = 'block';
+  stopBtn.style.display = 'none';
+});
+
+writeBtn.addEventListener('click', async ()=>{
+  if (!('NDEFReader' in window)){
+    logEntry('ERROR', 'Web NFC not supported.');
+    return;
+  }
+  const value = mode === 'text' ? textInput.value.trim() : urlInput.value.trim();
+  if (!value){
+    logEntry('ERROR', 'Enter some ' + (mode === 'text' ? 'text' : 'a URL') + ' first.');
+    return;
+  }
+  try{
+    writeBtn.disabled = true;
+    writeBtn.textContent = 'Waiting for tag…';
+    const writer = new NDEFReader();
+    const record = mode === 'text'
+      ? { recordType: 'text', data: value }
+      : { recordType: 'url', data: value };
+    await writer.write({ records: [record] });
+    logEntry('WRITE', 'Wrote ' + mode + ': "' + value + '"');
+  }catch(err){
+    logEntry('ERROR', 'Write failed: ' + err.message);
+  }finally{
+    writeBtn.disabled = false;
+    writeBtn.textContent = 'Tap tag to write';
+  }
+});
+
+init();
+</script>
+</body>
+</html>
