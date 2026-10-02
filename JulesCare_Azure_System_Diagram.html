@@ -1,0 +1,359 @@
+<title>JulesCare on Azure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: Azure system diagram centred, legend above, service mapping table and design notes below */
+:root{
+  --bg:#f3f5f6; --surface:#ffffff; --fg:#18232c; --muted:#5b6872; --line:#c9d1d6; --zone:#eef1f3;
+  --human:#2a62c9; --human-bg:#e7eefb;
+  --ai:#a85f00; --ai-bg:#fbf1e2;
+  --block:#c0362c; --block-bg:#fbe9e7;
+  --ok:#2c7a57;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12181d; --surface:#1a2228; --fg:#e3e9ed; --muted:#97a4ad; --line:#36424b; --zone:#172026;
+  --human:#7aa7f5; --human-bg:#1b2a42; --ai:#f0a744; --ai-bg:#33260f; --block:#f07b70; --block-bg:#3a1c19; --ok:#5fc195;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12181d; --surface:#1a2228; --fg:#e3e9ed; --muted:#97a4ad; --line:#36424b; --zone:#172026;
+  --human:#7aa7f5; --human-bg:#1b2a42; --ai:#f0a744; --ai-bg:#33260f; --block:#f07b70; --block-bg:#3a1c19; --ok:#5fc195;
+  color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:20px;padding-block:32px 48px;display:grid;gap:22px}
+header{display:grid;gap:6px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:600;font-size:clamp(26px,3.4vw,36px);line-height:1.1;margin:0;text-wrap:balance}
+.lede{margin:0;max-width:72ch;color:var(--muted)}
+.lede b{color:var(--fg);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:14px;height:14px;border-radius:3px;border:1.5px solid;display:inline-block}
+.sw.det{background:var(--surface);border-color:var(--fg)}
+.sw.hum{background:var(--human-bg);border-color:var(--human)}
+.sw.ai{background:var(--ai-bg);border-color:var(--ai)}
+.sw.blk{background:var(--block-bg);border-color:var(--block);border-style:dashed}
+.sw.zone{background:transparent;border-color:var(--muted);border-style:dashed}
+figure{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.scroll{overflow-x:auto}
+figure svg{display:block;width:100%;min-width:900px;height:auto;color:var(--fg)}
+figcaption{font-size:13px;color:var(--muted);padding:10px 4px 2px;max-width:100ch}
+
+/* SVG classes */
+.b{fill:var(--surface);stroke:var(--fg);stroke-width:1.4}
+.b-h{fill:var(--human-bg);stroke:var(--human);stroke-width:1.4}
+.b-ai{fill:var(--ai-bg);stroke:var(--ai);stroke-width:1.4}
+.b-x{fill:var(--block-bg);stroke:var(--block);stroke-width:1.4;stroke-dasharray:5 4}
+.b-store{fill:var(--zone);stroke:var(--fg);stroke-width:1.4}
+.b-fut{fill:none;stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 4}
+.zone{fill:none;stroke:var(--muted);stroke-width:1.3;stroke-dasharray:7 5}
+.zone-ai{fill:none;stroke:var(--ai);stroke-width:1.3;stroke-dasharray:7 5}
+.spine{fill:var(--zone);stroke:var(--ok);stroke-width:1.4}
+.e{fill:none;stroke:var(--fg);stroke-width:1.3}
+.e-h{fill:none;stroke:var(--human);stroke-width:1.5}
+.e-ai{fill:none;stroke:var(--ai);stroke-width:1.5}
+.e-x{fill:none;stroke:var(--block);stroke-width:1.5;stroke-dasharray:5 4}
+.e-ok{fill:none;stroke:var(--ok);stroke-width:1.3;stroke-dasharray:2 3}
+.mk{fill:var(--fg)} .mk-h{fill:var(--human)} .mk-ai{fill:var(--ai)} .mk-ok{fill:var(--ok)}
+.t{font-family:var(--f-body);font-size:12.5px;font-weight:600;fill:var(--fg)}
+.s{font-family:var(--f-body);font-size:10.5px;fill:var(--muted)}
+.tag{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.06em;fill:var(--muted)}
+.lb{font-family:var(--f-mono);font-size:9.5px;fill:var(--fg)}
+.lb-h{font-family:var(--f-mono);font-size:9.5px;fill:var(--human)}
+.lb-ai{font-family:var(--f-mono);font-size:9.5px;fill:var(--ai)}
+.lb-x{font-family:var(--f-mono);font-size:9.5px;fill:var(--block)}
+.lb-ok{font-family:var(--f-mono);font-size:9.5px;fill:var(--ok)}
+.zl{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;fill:var(--muted)}
+.zl-ai{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;fill:var(--ai)}
+.xx{stroke:var(--block);stroke-width:2.2}
+
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.note h2{font-family:var(--f-display);font-size:16px;font-weight:600;margin:0 0 4px}
+.note p{margin:0;font-size:13.5px;color:var(--muted)}
+.note code{font-family:var(--f-mono);font-size:12px;color:var(--fg)}
+footer{font-size:12px;color:var(--muted)}
+.grp{fill:none;stroke:var(--muted);stroke-width:1.1;stroke-dasharray:3 4}
+.grp-x{fill:var(--block-bg);fill-opacity:.35;stroke:var(--block);stroke-width:1.3;stroke-dasharray:6 4}
+.layer{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;fill:var(--muted)}
+.band{fill:var(--zone);stroke:var(--fg);stroke-width:1.2}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:9px 14px;border-bottom:1px solid var(--line)}
+th{font-family:var(--f-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--zone)}
+td:first-child{font-weight:600;white-space:nowrap}
+td.no{color:var(--block)}
+tr:last-child td{border-bottom:0}
+h2.sec{font-family:var(--f-display);font-weight:600;font-size:20px;margin:6px 0 0}
+p.sub{margin:0;color:var(--muted);font-size:13.5px;max-width:80ch}
+.az{font-family:var(--f-mono);font-size:9px;letter-spacing:.06em;fill:var(--human)}
+.notes2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">JulesCare MVP · JC-MVP-2026 · Azure system view</div>
+    <h1>JulesCare on Azure</h1>
+    <p class="lede">A pilot-sized Azure deployment of the logical architecture: <b>an all-.NET stack</b>, with a Blazor web client (and optional MAUI Blazor Hybrid mobile apps) over one modular monolith on Azure Container Apps, the AI orchestrator and MCP server in their own containers with their own identities, and every data service behind a private endpoint in Canada.</p>
+  </header>
+
+  <div class="legend" aria-label="Legend">
+    <span><i class="sw det"></i>Azure service / workload</span>
+    <span><i class="sw hum"></i>User or identity</span>
+    <span><i class="sw ai"></i>AI service</span>
+    <span><i class="sw blk"></i>Untrusted or isolated</span>
+    <span><i class="sw zone"></i>Region / VNet / subnet</span>
+  </div>
+
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 50 1270 830" role="img" aria-label="JulesCare Azure system diagram. Users sign in with Microsoft Entra and reach the app through Front Door with WAF. A Container Apps environment in a private VNet runs the API monolith, an AI worker with no database credentials, and an MCP server with read-only database access. API Management fronts Azure OpenAI and AI Content Safety. Azure SQL, Service Bus and Blob Storage sit behind private endpoints; the commercial database is separate with no login for matching, worker or MCP.">
+      <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-h" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ai" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+
+      <!-- ===== Users ===== -->
+      <rect class="b-h" x="20" y="200" width="145" height="58" rx="8"/>
+      <text class="t" x="92" y="222" text-anchor="middle">Provider staff</text>
+      <text class="t" x="92" y="236" text-anchor="middle">&amp; reviewers</text>
+      <text class="s" x="92" y="250" text-anchor="middle">browser · phone (opt.)</text>
+
+      <rect class="b-h" x="20" y="300" width="145" height="50" rx="8"/>
+      <text class="t" x="92" y="321" text-anchor="middle">CTC evidence</text>
+      <text class="t" x="92" y="336" text-anchor="middle">reviewers</text>
+
+      <rect class="b-x" x="20" y="470" width="145" height="50" rx="6"/>
+      <text class="t" x="92" y="491" text-anchor="middle">Vendors / web</text>
+      <text class="s" x="92" y="507" text-anchor="middle">no direct access</text>
+      <line class="e-x" x1="92" y1="470" x2="92" y2="353" marker-end="url(#a)"/>
+      <text class="lb-x" x="98" y="420">docs reach</text>
+      <text class="lb-x" x="98" y="432">CTC reviewers</text>
+      <text class="lb-x" x="98" y="444">for curation</text>
+
+      <!-- ===== Edge & identity ===== -->
+      <rect class="b-h" x="190" y="85" width="150" height="70" rx="6"/>
+      <text class="az" x="200" y="101">IDENTITY</text>
+      <text class="t" x="265" y="119" text-anchor="middle">Microsoft Entra</text>
+      <text class="s" x="265" y="134" text-anchor="middle">External ID · providers</text>
+      <text class="s" x="265" y="147" text-anchor="middle">Entra ID · CTC · MSAL.NET</text>
+
+      <rect class="b" x="190" y="195" width="150" height="95" rx="6"/>
+      <text class="az" x="200" y="211">EDGE · GLOBAL</text>
+      <text class="t" x="265" y="231" text-anchor="middle">Front Door Premium</text>
+      <text class="s" x="265" y="248" text-anchor="middle">WAF · TLS · bot rules</text>
+      <text class="s" x="265" y="262" text-anchor="middle">Private Link to origin</text>
+      <text class="s" x="265" y="276" text-anchor="middle">rate limits</text>
+
+      <rect class="b" x="190" y="340" width="150" height="56" rx="6"/>
+      <text class="t" x="265" y="361" text-anchor="middle">Static Web Apps</text>
+      <text class="s" x="265" y="376" text-anchor="middle">Blazor WebAssembly</text>
+      <text class="s" x="265" y="389" text-anchor="middle">web client</text>
+
+      <line class="e-h" x1="165" y1="229" x2="188" y2="229" marker-end="url(#ah)"/>
+      <path class="e-h" d="M165,325 H177 V270 H188" marker-end="url(#ah)"/>
+      <line class="e" x1="265" y1="290" x2="265" y2="338" marker-end="url(#a)"/>
+      <text class="lb" x="271" y="318">app assets</text>
+
+      <!-- Shared Razor library + optional MAUI apps -->
+      <rect class="band" x="190" y="410" width="150" height="34" rx="6"/>
+      <text class="tag" x="265" y="424" text-anchor="middle">SHARED RAZOR CLASS LIB</text>
+      <text class="s" x="265" y="437" text-anchor="middle">one set of UI components</text>
+      <line class="e" x1="265" y1="410" x2="265" y2="398" marker-end="url(#a)"/>
+      <line class="e" x1="265" y1="444" x2="265" y2="458" marker-end="url(#a)"/>
+      <rect class="b-fut" x="190" y="460" width="150" height="80" rx="6" style="stroke:var(--human)"/>
+      <text class="az" x="200" y="476">OPTIONAL · LATER PHASE</text>
+      <text class="t" x="265" y="494" text-anchor="middle">iOS · Android apps</text>
+      <text class="s" x="265" y="509" text-anchor="middle">.NET MAUI Blazor Hybrid</text>
+      <text class="s" x="265" y="523" text-anchor="middle">same /api, same tokens</text>
+      <text class="s" x="265" y="535" text-anchor="middle">no offline tenant data</text>
+      <path class="e-h" d="M340,500 H351 V270 H342" marker-end="url(#ah)"/>
+      <text class="lb-h" x="265" y="556" text-anchor="middle">TestFlight · Play · MDM</text>
+
+      <!-- ===== Region ===== -->
+      <rect class="zone" x="360" y="60" width="895" height="718" rx="12"/>
+      <text class="zl" x="375" y="80">AZURE · CANADA CENTRAL · rg-julescare-pilot · DR PAIR CANADA EAST</text>
+
+      <!-- ===== VNet ===== -->
+      <rect class="zone" x="380" y="96" width="650" height="666" rx="10"/>
+      <text class="zl" x="395" y="114">vnet-julescare · 10.20.0.0/16</text>
+
+      <!-- Container Apps env -->
+      <rect class="grp" x="400" y="135" width="480" height="285" rx="8"/>
+      <text class="zl" x="590" y="158">snet-apps · CONTAINER APPS ENV</text>
+
+      <rect class="b" x="420" y="165" width="160" height="125" rx="6"/>
+      <text class="az" x="430" y="181">CONTAINER APP</text>
+      <text class="t" x="500" y="200" text-anchor="middle">ca-api</text>
+      <text class="s" x="500" y="216" text-anchor="middle">.NET modular monolith</text>
+      <text class="s" x="500" y="231" text-anchor="middle">intake · requirements</text>
+      <text class="s" x="500" y="245" text-anchor="middle">matching · approvals</text>
+      <text class="s" x="500" y="259" text-anchor="middle">curation · audit</text>
+      <text class="lb" x="500" y="279" text-anchor="middle">identity: mi-api</text>
+
+      <rect class="b-ai" x="700" y="165" width="160" height="105" rx="6"/>
+      <text class="az" x="710" y="181" style="fill:var(--ai)">CONTAINER APP · KEDA</text>
+      <text class="t" x="780" y="200" text-anchor="middle">ca-worker</text>
+      <text class="s" x="780" y="216" text-anchor="middle">AI orchestrator</text>
+      <text class="s" x="780" y="230" text-anchor="middle">+ output validator</text>
+      <text class="lb-x" x="780" y="246" text-anchor="middle">no DB credentials</text>
+      <text class="lb" x="780" y="261" text-anchor="middle">identity: mi-worker</text>
+
+      <rect class="b" x="735" y="320" width="125" height="75" rx="6"/>
+      <text class="az" x="745" y="336">CONTAINER APP</text>
+      <text class="t" x="797" y="354" text-anchor="middle">ca-mcp</text>
+      <text class="s" x="797" y="369" text-anchor="middle">MCP tool server</text>
+      <text class="lb" x="797" y="385" text-anchor="middle">mi-mcp · read-only</text>
+
+      <rect class="b-fut" x="420" y="320" width="110" height="75" rx="6"/>
+      <text class="t" x="475" y="352" text-anchor="middle">ca-billing</text>
+      <text class="s" x="475" y="368" text-anchor="middle">future · not MVP</text>
+
+      <!-- APIM -->
+      <rect class="b" x="895" y="165" width="120" height="105" rx="6"/>
+      <text class="az" x="905" y="181">snet-apim</text>
+      <text class="t" x="955" y="200" text-anchor="middle">API Management</text>
+      <text class="s" x="955" y="216" text-anchor="middle">AI gateway</text>
+      <text class="s" x="955" y="230" text-anchor="middle">token quotas</text>
+      <text class="s" x="955" y="244" text-anchor="middle">safety policy</text>
+      <text class="s" x="955" y="258" text-anchor="middle">model routing</text>
+
+      <!-- Private endpoint subnet -->
+      <rect class="grp" x="400" y="450" width="615" height="302" rx="8"/>
+      <text class="zl" x="415" y="745">snet-pe · PRIVATE ENDPOINTS · PUBLIC NETWORK ACCESS DISABLED</text>
+
+      <rect class="b-x" x="420" y="480" width="112" height="80" rx="6"/>
+      <text class="az" x="430" y="496" style="fill:var(--block)">AZURE SQL DB</text>
+      <text class="t" x="476" y="514" text-anchor="middle" style="font-size:11.5px">sqldb-commercial</text>
+      <text class="lb-x" x="476" y="532" text-anchor="middle">no login for api,</text>
+      <text class="lb-x" x="476" y="545" text-anchor="middle">worker or mcp</text>
+
+      <rect class="b" x="580" y="480" width="120" height="80" rx="6"/>
+      <text class="az" x="590" y="496">MESSAGING</text>
+      <text class="t" x="640" y="514" text-anchor="middle">Service Bus</text>
+      <text class="s" x="640" y="530" text-anchor="middle">match + AI queues</text>
+      <text class="s" x="640" y="544" text-anchor="middle">org_id on message</text>
+
+      <rect class="b" x="840" y="480" width="160" height="80" rx="6"/>
+      <text class="az" x="850" y="496">STORAGE</text>
+      <text class="t" x="920" y="514" text-anchor="middle">Blob Storage</text>
+      <text class="s" x="920" y="530" text-anchor="middle">evidence files</text>
+      <text class="s" x="920" y="544" text-anchor="middle">immutable (WORM) policy</text>
+
+      <rect class="b-store" x="420" y="620" width="580" height="110" rx="6"/>
+      <text class="az" x="435" y="638">AZURE SQL DATABASE</text>
+      <text class="t" x="435" y="658">sqldb-julescare</text>
+      <text class="s" x="435" y="676">tenant schema: needs · requirement versions · match runs · fit findings · shortlists · approvals (RLS on org_id)</text>
+      <text class="s" x="435" y="692">catalog schema: solutions · capabilities · claims · evidence · reviews (shared, versioned)</text>
+      <text class="s" x="435" y="708">ledger tables for tamper-evident audit · TDE · point-in-time restore · failover group to Canada East</text>
+      <text class="lb" x="435" y="723">logins: mi-api → app_rw (RLS) · mi-mcp → mcp_readonly (views only)</text>
+
+      <!-- Data edges -->
+      <line class="e" x1="545" y1="290" x2="545" y2="618" marker-end="url(#a)"/>
+      <text class="lb" x="551" y="598">app_rw · RLS</text>
+      <path class="e" d="M570,290 V440 H600 V478" marker-end="url(#a)" marker-start="url(#a)"/>
+      <path class="e" d="M680,478 V440 H715 V272" marker-end="url(#a)" marker-start="url(#a)"/>
+      <text class="lb" x="640" y="436" text-anchor="middle">jobs ⇄ results</text>
+      <line class="e" x1="800" y1="397" x2="800" y2="618" marker-start="url(#a)"/>
+      <text class="lb" x="806" y="598">read-only views</text>
+      <path class="e" d="M500,165 V143 H875 V478" marker-end="url(#a)"/>
+      <text class="lb" x="870" y="440" text-anchor="end">evidence uploads</text>
+      <line class="e-x" x1="475" y1="395" x2="475" y2="478" style="stroke:var(--muted)" marker-end="url(#a)"/>
+
+      <!-- Front Door to api -->
+      <line class="e" x1="340" y1="229" x2="418" y2="229" marker-end="url(#a)"/>
+      <text class="lb" x="379" y="222" text-anchor="middle">/api</text>
+
+      <!-- worker / mcp / apim -->
+      <line class="e-ai" x1="800" y1="270" x2="800" y2="318" marker-end="url(#aa)"/>
+      <text class="lb-ai" x="806" y="308">tool calls</text>
+      <line class="e-ai" x1="860" y1="215" x2="893" y2="215" marker-end="url(#aa)"/>
+      <text class="lb-ai" x="877" y="208" text-anchor="middle">LLM</text>
+
+      <!-- ===== AI services ===== -->
+      <rect class="b-ai" x="1050" y="90" width="190" height="52" rx="6"/>
+      <text class="t" x="1145" y="111" text-anchor="middle">AI Content Safety</text>
+      <text class="s" x="1145" y="128" text-anchor="middle">Prompt Shields on vendor text</text>
+      <path class="e-ai" d="M955,165 V116 H1048" marker-end="url(#aa)"/>
+
+      <rect class="b-ai" x="1050" y="172" width="190" height="56" rx="6"/>
+      <text class="t" x="1145" y="194" text-anchor="middle">Azure OpenAI</text>
+      <text class="s" x="1145" y="210" text-anchor="middle">via AI Foundry · pinned</text>
+      <text class="s" x="1145" y="222" text-anchor="middle">model + deployment version</text>
+      <line class="e-ai" x1="1015" y1="200" x2="1048" y2="200" marker-end="url(#aa)"/>
+
+      <rect class="b-ai" x="1050" y="255" width="190" height="52" rx="6"/>
+      <text class="t" x="1145" y="276" text-anchor="middle">AI Language</text>
+      <text class="s" x="1145" y="293" text-anchor="middle">PII + health entity detection</text>
+      <line class="e" x1="580" y1="281" x2="1048" y2="281" marker-end="url(#a)"/>
+      <text class="lb" x="955" y="295" text-anchor="middle">PHI check at intake</text>
+
+      <!-- ===== Notification Hubs (optional) ===== -->
+      <rect class="b-fut" x="1050" y="340" width="190" height="62" rx="6"/>
+      <text class="az" x="1062" y="356">OPTIONAL · WITH MOBILE</text>
+      <text class="t" x="1145" y="374" text-anchor="middle">Notification Hubs</text>
+      <text class="s" x="1145" y="390" text-anchor="middle">approval-request push</text>
+
+      <!-- ===== Shared services ===== -->
+      <rect class="b" x="1050" y="470" width="190" height="275" rx="6"/>
+      <text class="az" x="1062" y="488">SHARED PLATFORM</text>
+      <text class="t" x="1062" y="510">Key Vault</text>
+      <text class="s" x="1062" y="524">secrets · keys</text>
+      <text class="t" x="1062" y="550">Container Registry</text>
+      <text class="s" x="1062" y="564">signed images</text>
+      <text class="t" x="1062" y="590">Application Insights</text>
+      <text class="s" x="1062" y="604">traces · failed tool calls</text>
+      <text class="t" x="1062" y="630">Log Analytics</text>
+      <text class="s" x="1062" y="644">PHI-free logs · workbooks</text>
+      <text class="t" x="1062" y="670">Defender for Cloud</text>
+      <text class="s" x="1062" y="684">posture · threat alerts</text>
+      <text class="t" x="1062" y="710">Managed identities</text>
+      <text class="s" x="1062" y="724">one per workload</text>
+
+      <!-- ===== Delivery strip ===== -->
+      <rect class="band" x="20" y="795" width="1235" height="60" rx="6"/>
+      <text class="tag" x="36" y="815">DELIVERY</text>
+      <text class="s" x="36" y="834">GitHub Actions → Bicep IaC → signed image in Container Registry → Container Apps revision with traffic split · Blazor WASM → Static Web Apps · optional MAUI builds → TestFlight / Play internal testing</text>
+      <text class="s" x="36" y="848">Automated gates before promotion: cross-tenant denial (NFR-01) · payment-blind regression (T03) · PHI block (T01) · prompt-injection suite (T10)</text>
+    </svg>
+    </div>
+    <figcaption>The Blazor web client and the optional iOS and Android apps share one Razor component library and call the same API. Requests enter through Front Door and Private Link only. ca-api owns all writes. ca-worker runs the AI orchestrator, gets jobs from Service Bus, calls models only through API Management, and fetches data only through ca-mcp, which logs in to SQL with a read-only, view-only role. The commercial database has no login for any of those identities.</figcaption>
+  </figure>
+
+  <h2 class="sec">Logical component to Azure service</h2>
+  <p class="sub">How each part of the logical view lands on Azure, and why that service fits a 3–5 provider pilot.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Logical component</th><th>Azure service</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Presentation (web)</td><td>Blazor WebAssembly on Static Web Apps, behind Front Door Premium + WAF</td><td>All-.NET UI that matches the team; static hosting with one edge, WAF and Private Link to a private origin.</td></tr>
+        <tr><td>Presentation (mobile, optional)</td><td>.NET MAUI Blazor Hybrid apps for iOS and Android</td><td>Reuses the same Razor components; calls the same API with MSAL.NET tokens, so tenancy and audit are unchanged. Distribute via TestFlight, Play internal testing or MDM.</td></tr>
+        <tr><td>Identity &amp; access</td><td>Entra External ID (providers), Entra ID (CTC staff)</td><td>OIDC tokens carry org and role claims; ca-api sets the tenant context from them.</td></tr>
+        <tr><td>API layer + domain modules</td><td>Container Apps: ca-api (.NET)</td><td>Fits the modular-monolith decision; scales to zero-ish at pilot load without running Kubernetes.</td></tr>
+        <tr><td>AI orchestrator + validator</td><td>Container Apps: ca-worker, KEDA on Service Bus</td><td>Separate identity with no database login, so a compromised prompt cannot reach data directly.</td></tr>
+        <tr><td>MCP tool server</td><td>Container Apps: ca-mcp</td><td>Distinct hosting per ADR-0001; the only AI-side path to data, through read-only views bound to org_id.</td></tr>
+        <tr><td>LLM gateway</td><td>API Management (AI gateway policies)</td><td>Token quotas, logging, content-safety policy and model routing keep the design provider-aware but not provider-dependent.</td></tr>
+        <tr><td>Prompt-injection defence</td><td>AI Content Safety (Prompt Shields)</td><td>Scans retrieved vendor text before it reaches the model (NFR-05, T10).</td></tr>
+        <tr><td>Prohibited-data guard</td><td>AI Language (PII and health entities)</td><td>Detects names, room numbers and diagnoses at intake; ca-api rejects before persisting (REQ-01, T01).</td></tr>
+        <tr><td>Tenant + catalog data, audit</td><td>Azure SQL Database with row-level security and ledger tables</td><td>RLS enforces tenancy in the engine; ledger tables give a hash-chained, tamper-evident history (NFR-01, NFR-04).</td></tr>
+        <tr><td>Commercial accounts</td><td>Separate Azure SQL database</td><td>Payment-blind by construction: no login exists for matching, worker or MCP identities (NFR-03).</td></tr>
+        <tr><td>Push notifications (optional)</td><td>Notification Hubs</td><td>Lets ca-api alert reviewers on mobile when a shortlist is waiting for approval. The message carries no tenant content.</td></tr>
+        <tr><td>Job queue</td><td>Service Bus</td><td>Durable, idempotent retries for match runs and AI jobs; org_id travels on each message.</td></tr>
+        <tr><td>Evidence files</td><td>Blob Storage with immutability policy</td><td>Evidence sources are immutable once reviewed.</td></tr>
+        <tr><td>Observability</td><td>Application Insights, Log Analytics, Defender for Cloud</td><td>Traces failed tool calls and model outputs; logs kept free of PHI (NFR-02).</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <section class="notes2" aria-label="Design notes">
+    <div class="note"><h2>Why not AKS</h2><p>The brief asks for the simplest design that fits the pilot. Container Apps gives revisions, KEDA scaling, VNet integration and managed identities without running a cluster. Revisit AKS if the workload count or operational control needs grow.</p></div>
+    <div class="note"><h2>Azure SQL or PostgreSQL</h2><p>Azure SQL is shown for its built-in ledger tables and the team's .NET background. PostgreSQL Flexible Server also supports RLS; it would need an application-level hash chain for the audit log.</p></div>
+    <div class="note"><h2>Web first, mobile later</h2><p>Ship the Blazor web client for the pilot and December beta. Keep UI in the shared Razor library so the MAUI apps can follow when reviewers want mobile approvals, likely near the April 2027 introduction.</p></div>
+    <div class="note"><h2>Check before committing</h2><p>Confirm that the chosen Azure OpenAI models and Content Safety features are available in Canada regions, and that data-residency terms suit the provider pilots.</p></div>
+  </section>
+
+  <footer>Sources: JulesCare HL-BRD v1.0, ADR-0001, Technical Architecture and Collaboration Exercise, Advisor Candidate Architecture Brief. The Azure service choices, names and address ranges are proposals for the pilot, not decisions recorded in the source documents.</footer>
+</div>

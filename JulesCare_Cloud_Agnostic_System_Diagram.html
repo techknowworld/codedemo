@@ -1,0 +1,365 @@
+<title>JulesCare Cloud-Agnostic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: cloud-agnostic system diagram centred, legend above, service mapping table and design notes below */
+:root{
+  --bg:#f3f5f6; --surface:#ffffff; --fg:#18232c; --muted:#5b6872; --line:#c9d1d6; --zone:#eef1f3;
+  --human:#2a62c9; --human-bg:#e7eefb;
+  --ai:#a85f00; --ai-bg:#fbf1e2;
+  --block:#c0362c; --block-bg:#fbe9e7;
+  --ok:#2c7a57;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12181d; --surface:#1a2228; --fg:#e3e9ed; --muted:#97a4ad; --line:#36424b; --zone:#172026;
+  --human:#7aa7f5; --human-bg:#1b2a42; --ai:#f0a744; --ai-bg:#33260f; --block:#f07b70; --block-bg:#3a1c19; --ok:#5fc195;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12181d; --surface:#1a2228; --fg:#e3e9ed; --muted:#97a4ad; --line:#36424b; --zone:#172026;
+  --human:#7aa7f5; --human-bg:#1b2a42; --ai:#f0a744; --ai-bg:#33260f; --block:#f07b70; --block-bg:#3a1c19; --ok:#5fc195;
+  color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:20px;padding-block:32px 48px;display:grid;gap:22px}
+header{display:grid;gap:6px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:600;font-size:clamp(26px,3.4vw,36px);line-height:1.1;margin:0;text-wrap:balance}
+.lede{margin:0;max-width:72ch;color:var(--muted)}
+.lede b{color:var(--fg);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:14px;height:14px;border-radius:3px;border:1.5px solid;display:inline-block}
+.sw.det{background:var(--surface);border-color:var(--fg)}
+.sw.hum{background:var(--human-bg);border-color:var(--human)}
+.sw.ai{background:var(--ai-bg);border-color:var(--ai)}
+.sw.blk{background:var(--block-bg);border-color:var(--block);border-style:dashed}
+.sw.zone{background:transparent;border-color:var(--muted);border-style:dashed}
+figure{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.scroll{overflow-x:auto}
+figure svg{display:block;width:100%;min-width:900px;height:auto;color:var(--fg)}
+figcaption{font-size:13px;color:var(--muted);padding:10px 4px 2px;max-width:100ch}
+
+/* SVG classes */
+.b{fill:var(--surface);stroke:var(--fg);stroke-width:1.4}
+.b-h{fill:var(--human-bg);stroke:var(--human);stroke-width:1.4}
+.b-ai{fill:var(--ai-bg);stroke:var(--ai);stroke-width:1.4}
+.b-x{fill:var(--block-bg);stroke:var(--block);stroke-width:1.4;stroke-dasharray:5 4}
+.b-store{fill:var(--zone);stroke:var(--fg);stroke-width:1.4}
+.b-fut{fill:none;stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 4}
+.zone{fill:none;stroke:var(--muted);stroke-width:1.3;stroke-dasharray:7 5}
+.zone-ai{fill:none;stroke:var(--ai);stroke-width:1.3;stroke-dasharray:7 5}
+.spine{fill:var(--zone);stroke:var(--ok);stroke-width:1.4}
+.e{fill:none;stroke:var(--fg);stroke-width:1.3}
+.e-h{fill:none;stroke:var(--human);stroke-width:1.5}
+.e-ai{fill:none;stroke:var(--ai);stroke-width:1.5}
+.e-x{fill:none;stroke:var(--block);stroke-width:1.5;stroke-dasharray:5 4}
+.e-ok{fill:none;stroke:var(--ok);stroke-width:1.3;stroke-dasharray:2 3}
+.mk{fill:var(--fg)} .mk-h{fill:var(--human)} .mk-ai{fill:var(--ai)} .mk-ok{fill:var(--ok)}
+.t{font-family:var(--f-body);font-size:12.5px;font-weight:600;fill:var(--fg)}
+.s{font-family:var(--f-body);font-size:10.5px;fill:var(--muted)}
+.tag{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.06em;fill:var(--muted)}
+.lb{font-family:var(--f-mono);font-size:9.5px;fill:var(--fg)}
+.lb-h{font-family:var(--f-mono);font-size:9.5px;fill:var(--human)}
+.lb-ai{font-family:var(--f-mono);font-size:9.5px;fill:var(--ai)}
+.lb-x{font-family:var(--f-mono);font-size:9.5px;fill:var(--block)}
+.lb-ok{font-family:var(--f-mono);font-size:9.5px;fill:var(--ok)}
+.zl{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;fill:var(--muted)}
+.zl-ai{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;fill:var(--ai)}
+.xx{stroke:var(--block);stroke-width:2.2}
+
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.note h2{font-family:var(--f-display);font-size:16px;font-weight:600;margin:0 0 4px}
+.note p{margin:0;font-size:13.5px;color:var(--muted)}
+.note code{font-family:var(--f-mono);font-size:12px;color:var(--fg)}
+footer{font-size:12px;color:var(--muted)}
+.grp{fill:none;stroke:var(--muted);stroke-width:1.1;stroke-dasharray:3 4}
+.grp-x{fill:var(--block-bg);fill-opacity:.35;stroke:var(--block);stroke-width:1.3;stroke-dasharray:6 4}
+.layer{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;fill:var(--muted)}
+.band{fill:var(--zone);stroke:var(--fg);stroke-width:1.2}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:9px 14px;border-bottom:1px solid var(--line)}
+th{font-family:var(--f-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--zone)}
+td:first-child{font-weight:600;white-space:nowrap}
+td.no{color:var(--block)}
+tr:last-child td{border-bottom:0}
+h2.sec{font-family:var(--f-display);font-weight:600;font-size:20px;margin:6px 0 0}
+p.sub{margin:0;color:var(--muted);font-size:13.5px;max-width:80ch}
+.az{font-family:var(--f-mono);font-size:9px;letter-spacing:.06em;fill:var(--human)}
+.notes2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">JulesCare MVP · JC-MVP-2026 · Cloud-agnostic system view</div>
+    <h1>JulesCare, cloud-agnostic</h1>
+    <p class="lede">The same logical architecture built only on <b>open, portable components</b>: containers on any conformant Kubernetes, PostgreSQL, RabbitMQ, S3-compatible storage, Keycloak for sign-in and an open-source LLM gateway that can route to any model provider. It runs on Azure, Google Cloud, AWS, a Canadian sovereign cloud or on-premises, with only the managed-service adapters changing.</p>
+  </header>
+
+  <div class="legend" aria-label="Legend">
+    <span><i class="sw det"></i>Portable workload / open component</span>
+    <span><i class="sw hum"></i>User or identity</span>
+    <span><i class="sw ai"></i>AI service</span>
+    <span><i class="sw blk"></i>Untrusted or isolated</span>
+    <span><i class="sw zone"></i>Region / network / cluster</span>
+  </div>
+
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 50 1270 830" role="img" aria-label="JulesCare cloud-agnostic system diagram. Users sign in with Keycloak and reach the app through a CDN with WAF and a Kubernetes ingress gateway. A Kubernetes cluster in a private network runs the API monolith, an AI worker with no database credentials, and an MCP server with read-only database access. A LiteLLM gateway fronts any LLM provider and an injection-screening guard model; Presidio checks intake for personal and health data. PostgreSQL, RabbitMQ and S3-compatible storage sit in a data subnet with no public endpoints; the commercial database is separate with no role for matching, worker or MCP.">
+      <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-h" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ai" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+
+      <!-- ===== Users ===== -->
+      <rect class="b-h" x="20" y="200" width="145" height="58" rx="8"/>
+      <text class="t" x="92" y="222" text-anchor="middle">Provider staff</text>
+      <text class="t" x="92" y="236" text-anchor="middle">&amp; reviewers</text>
+      <text class="s" x="92" y="250" text-anchor="middle">browser · phone (opt.)</text>
+
+      <rect class="b-h" x="20" y="300" width="145" height="50" rx="8"/>
+      <text class="t" x="92" y="321" text-anchor="middle">CTC evidence</text>
+      <text class="t" x="92" y="336" text-anchor="middle">reviewers</text>
+
+      <rect class="b-x" x="20" y="470" width="145" height="50" rx="6"/>
+      <text class="t" x="92" y="491" text-anchor="middle">Vendors / web</text>
+      <text class="s" x="92" y="507" text-anchor="middle">no direct access</text>
+      <line class="e-x" x1="92" y1="470" x2="92" y2="353" marker-end="url(#a)"/>
+      <text class="lb-x" x="98" y="420">docs reach</text>
+      <text class="lb-x" x="98" y="432">CTC reviewers</text>
+      <text class="lb-x" x="98" y="444">for curation</text>
+
+      <!-- ===== Edge & identity ===== -->
+      <rect class="b-h" x="190" y="85" width="150" height="70" rx="6"/>
+      <text class="az" x="200" y="101">IDENTITY · OIDC</text>
+      <text class="t" x="265" y="119" text-anchor="middle">Keycloak</text>
+      <text class="s" x="265" y="134" text-anchor="middle">realm: providers · realm: CTC</text>
+      <text class="s" x="265" y="147" text-anchor="middle">or any OIDC IdP · MFA</text>
+
+      <rect class="b" x="190" y="195" width="150" height="95" rx="6"/>
+      <text class="az" x="200" y="211">EDGE</text>
+      <text class="t" x="265" y="231" text-anchor="middle">CDN + WAF</text>
+      <text class="s" x="265" y="248" text-anchor="middle">OWASP CRS · TLS · bots</text>
+      <text class="s" x="265" y="262" text-anchor="middle">private origin only</text>
+      <text class="s" x="265" y="276" text-anchor="middle">rate limits</text>
+
+      <rect class="b" x="190" y="340" width="150" height="56" rx="6"/>
+      <text class="t" x="265" y="361" text-anchor="middle">Static web assets</text>
+      <text class="s" x="265" y="376" text-anchor="middle">Blazor WebAssembly</text>
+      <text class="s" x="265" y="389" text-anchor="middle">object storage + CDN</text>
+
+      <line class="e-h" x1="165" y1="229" x2="188" y2="229" marker-end="url(#ah)"/>
+      <path class="e-h" d="M165,325 H177 V270 H188" marker-end="url(#ah)"/>
+      <line class="e" x1="265" y1="290" x2="265" y2="338" marker-end="url(#a)"/>
+      <text class="lb" x="271" y="318">app assets</text>
+
+      <!-- Shared Razor library + optional MAUI apps -->
+      <rect class="band" x="190" y="410" width="150" height="34" rx="6"/>
+      <text class="tag" x="265" y="424" text-anchor="middle">SHARED RAZOR CLASS LIB</text>
+      <text class="s" x="265" y="437" text-anchor="middle">one set of UI components</text>
+      <line class="e" x1="265" y1="410" x2="265" y2="398" marker-end="url(#a)"/>
+      <line class="e" x1="265" y1="444" x2="265" y2="458" marker-end="url(#a)"/>
+      <rect class="b-fut" x="190" y="460" width="150" height="80" rx="6" style="stroke:var(--human)"/>
+      <text class="az" x="200" y="476">OPTIONAL · LATER PHASE</text>
+      <text class="t" x="265" y="494" text-anchor="middle">iOS · Android apps</text>
+      <text class="s" x="265" y="509" text-anchor="middle">.NET MAUI Blazor Hybrid</text>
+      <text class="s" x="265" y="523" text-anchor="middle">same /api, same tokens</text>
+      <text class="s" x="265" y="535" text-anchor="middle">no offline tenant data</text>
+      <path class="e-h" d="M340,500 H351 V270 H342" marker-end="url(#ah)"/>
+      <text class="lb-h" x="265" y="556" text-anchor="middle">TestFlight · Play · MDM</text>
+
+      <!-- ===== Region ===== -->
+      <rect class="zone" x="360" y="60" width="895" height="718" rx="12"/>
+      <text class="zl" x="375" y="80">ANY CLOUD OR ON-PREM · CANADIAN REGION · DR IN A SECOND CANADIAN REGION</text>
+
+      <!-- ===== Private network ===== -->
+      <rect class="zone" x="380" y="96" width="650" height="666" rx="10"/>
+      <text class="zl" x="395" y="114">private network · default-deny network policies</text>
+
+      <!-- Kubernetes cluster -->
+      <rect class="grp" x="400" y="135" width="480" height="285" rx="8"/>
+      <text class="zl" x="560" y="158">KUBERNETES CLUSTER · ns julescare</text>
+
+      <rect class="b" x="420" y="165" width="160" height="125" rx="6"/>
+      <text class="az" x="430" y="181">DEPLOYMENT</text>
+      <text class="t" x="500" y="200" text-anchor="middle">api</text>
+      <text class="s" x="500" y="216" text-anchor="middle">.NET modular monolith</text>
+      <text class="s" x="500" y="231" text-anchor="middle">intake · requirements</text>
+      <text class="s" x="500" y="245" text-anchor="middle">matching · approvals</text>
+      <text class="s" x="500" y="259" text-anchor="middle">curation · audit</text>
+      <text class="lb" x="500" y="279" text-anchor="middle">identity: sa-api</text>
+
+      <rect class="b-ai" x="700" y="165" width="160" height="105" rx="6"/>
+      <text class="az" x="710" y="181" style="fill:var(--ai)">DEPLOYMENT · KEDA</text>
+      <text class="t" x="780" y="200" text-anchor="middle">worker</text>
+      <text class="s" x="780" y="216" text-anchor="middle">AI orchestrator</text>
+      <text class="s" x="780" y="230" text-anchor="middle">+ output validator</text>
+      <text class="lb-x" x="780" y="246" text-anchor="middle">no DB credentials</text>
+      <text class="lb" x="780" y="261" text-anchor="middle">identity: sa-worker</text>
+
+      <rect class="b" x="735" y="320" width="125" height="75" rx="6"/>
+      <text class="az" x="745" y="336">DEPLOYMENT</text>
+      <text class="t" x="797" y="354" text-anchor="middle">mcp</text>
+      <text class="s" x="797" y="369" text-anchor="middle">MCP tool server</text>
+      <text class="lb" x="797" y="385" text-anchor="middle">sa-mcp · read-only</text>
+
+      <rect class="b-fut" x="420" y="320" width="110" height="75" rx="6"/>
+      <text class="t" x="475" y="352" text-anchor="middle">billing</text>
+      <text class="s" x="475" y="368" text-anchor="middle">future · not MVP</text>
+
+
+
+      <!-- LLM gateway -->
+      <rect class="b" x="895" y="165" width="120" height="105" rx="6"/>
+      <text class="az" x="905" y="181">DEPLOYMENT</text>
+      <text class="t" x="955" y="200" text-anchor="middle">LLM gateway</text>
+      <text class="s" x="955" y="216" text-anchor="middle">LiteLLM proxy</text>
+      <text class="s" x="955" y="230" text-anchor="middle">token quotas</text>
+      <text class="s" x="955" y="244" text-anchor="middle">guard policy</text>
+      <text class="s" x="955" y="258" text-anchor="middle">model routing</text>
+
+      <!-- Data subnet -->
+      <rect class="grp" x="400" y="450" width="615" height="302" rx="8"/>
+      <text class="zl" x="415" y="745">DATA SUBNET · NO PUBLIC ENDPOINTS · TLS + ENCRYPTION AT REST</text>
+
+      <rect class="b-x" x="420" y="480" width="112" height="80" rx="6"/>
+      <text class="az" x="430" y="496" style="fill:var(--block)">POSTGRESQL</text>
+      <text class="t" x="476" y="514" text-anchor="middle" style="font-size:11.5px">pg-commercial</text>
+      <text class="lb-x" x="476" y="532" text-anchor="middle">no role for api,</text>
+      <text class="lb-x" x="476" y="545" text-anchor="middle">worker or mcp</text>
+
+      <rect class="b" x="580" y="480" width="120" height="80" rx="6"/>
+      <text class="az" x="590" y="496">MESSAGING</text>
+      <text class="t" x="640" y="514" text-anchor="middle">RabbitMQ</text>
+      <text class="s" x="640" y="530" text-anchor="middle">match + AI queues</text>
+      <text class="s" x="640" y="544" text-anchor="middle">org_id on message</text>
+
+      <rect class="b" x="840" y="480" width="160" height="80" rx="6"/>
+      <text class="az" x="850" y="496">OBJECT STORAGE</text>
+      <text class="t" x="920" y="514" text-anchor="middle">S3-compatible API</text>
+      <text class="s" x="920" y="530" text-anchor="middle">evidence files</text>
+      <text class="s" x="920" y="544" text-anchor="middle">object lock (WORM)</text>
+
+      <rect class="b-store" x="420" y="620" width="580" height="110" rx="6"/>
+      <text class="az" x="435" y="638">POSTGRESQL 16</text>
+      <text class="t" x="435" y="658">pg-julescare</text>
+      <text class="s" x="435" y="676">tenant schema: needs · requirement versions · match runs · fit findings · shortlists · approvals (RLS on org_id)</text>
+      <text class="s" x="435" y="692">catalog schema: solutions · capabilities · claims · evidence · reviews (shared, versioned)</text>
+      <text class="s" x="435" y="708">append-only audit_event, hash-chained by the app · PITR backups · streaming replica to DR region</text>
+      <text class="lb" x="435" y="723">roles: sa-api → app_rw (RLS) · sa-mcp → mcp_readonly (views only)</text>
+
+      <!-- Data edges -->
+      <line class="e" x1="545" y1="290" x2="545" y2="618" marker-end="url(#a)"/>
+      <text class="lb" x="551" y="598">app_rw · RLS</text>
+      <path class="e" d="M570,290 V440 H600 V478" marker-end="url(#a)" marker-start="url(#a)"/>
+      <path class="e" d="M680,478 V440 H715 V272" marker-end="url(#a)" marker-start="url(#a)"/>
+      <text class="lb" x="640" y="436" text-anchor="middle">jobs ⇄ results</text>
+      <line class="e" x1="800" y1="397" x2="800" y2="618" marker-start="url(#a)"/>
+      <text class="lb" x="806" y="598">read-only views</text>
+      <path class="e" d="M500,165 V143 H875 V478" marker-end="url(#a)"/>
+      <text class="lb" x="870" y="440" text-anchor="end">evidence uploads</text>
+      <line class="e-x" x1="475" y1="395" x2="475" y2="478" style="stroke:var(--muted)" marker-end="url(#a)"/>
+
+      <!-- Edge to api -->
+      <line class="e" x1="340" y1="229" x2="418" y2="229" marker-end="url(#a)"/>
+      <text class="lb" x="379" y="222" text-anchor="middle">/api</text>
+      <text class="lb" x="379" y="244" text-anchor="middle">ingress</text>
+
+      <!-- worker / mcp / gateway -->
+      <line class="e-ai" x1="800" y1="270" x2="800" y2="318" marker-end="url(#aa)"/>
+      <text class="lb-ai" x="806" y="308">tool calls</text>
+      <line class="e-ai" x1="860" y1="215" x2="893" y2="215" marker-end="url(#aa)"/>
+      <text class="lb-ai" x="877" y="208" text-anchor="middle">LLM</text>
+
+      <!-- ===== AI services ===== -->
+      <rect class="b-ai" x="1050" y="90" width="190" height="52" rx="6"/>
+      <text class="t" x="1145" y="111" text-anchor="middle">Injection screening</text>
+      <text class="s" x="1145" y="128" text-anchor="middle">guard model on vendor text</text>
+      <path class="e-ai" d="M955,165 V116 H1048" marker-end="url(#aa)"/>
+
+      <rect class="b-ai" x="1050" y="172" width="190" height="70" rx="6"/>
+      <text class="t" x="1145" y="192" text-anchor="middle">Any LLM provider</text>
+      <text class="s" x="1145" y="208" text-anchor="middle">Azure OpenAI · Vertex AI</text>
+      <text class="s" x="1145" y="221" text-anchor="middle">Bedrock · or self-hosted vLLM</text>
+      <text class="s" x="1145" y="234" text-anchor="middle">pinned model version</text>
+      <line class="e-ai" x1="1015" y1="205" x2="1048" y2="205" marker-end="url(#aa)"/>
+
+      <rect class="b" x="1050" y="262" width="190" height="56" rx="6"/>
+      <text class="t" x="1145" y="283" text-anchor="middle">Presidio</text>
+      <text class="s" x="1145" y="298" text-anchor="middle">PII + health entity detection</text>
+      <text class="s" x="1145" y="311" text-anchor="middle">self-hosted container</text>
+      <line class="e" x1="580" y1="288" x2="1048" y2="288" marker-end="url(#a)"/>
+      <text class="lb" x="955" y="302" text-anchor="middle">PHI check at intake</text>
+
+      <!-- ===== Push (optional) ===== -->
+      <rect class="b-fut" x="1050" y="340" width="190" height="62" rx="6"/>
+      <text class="az" x="1062" y="356">OPTIONAL · WITH MOBILE</text>
+      <text class="t" x="1145" y="374" text-anchor="middle">FCM / APNs</text>
+      <text class="s" x="1145" y="390" text-anchor="middle">approval-request push</text>
+
+      <!-- ===== Shared services ===== -->
+      <rect class="b" x="1050" y="470" width="190" height="275" rx="6"/>
+      <text class="az" x="1062" y="488">SHARED PLATFORM</text>
+      <text class="t" x="1062" y="510">OpenBao / Vault</text>
+      <text class="s" x="1062" y="524">secrets · keys · External Secrets</text>
+      <text class="t" x="1062" y="550">OCI registry (Harbor)</text>
+      <text class="s" x="1062" y="564">cosign-signed images</text>
+      <text class="t" x="1062" y="590">OpenTelemetry</text>
+      <text class="s" x="1062" y="604">traces · failed tool calls</text>
+      <text class="t" x="1062" y="630">Grafana · Loki · Tempo</text>
+      <text class="s" x="1062" y="644">PHI-free logs · dashboards</text>
+      <text class="t" x="1062" y="670">Kyverno · Trivy</text>
+      <text class="s" x="1062" y="684">admission policy · image scans</text>
+      <text class="t" x="1062" y="710">Workload identities</text>
+      <text class="s" x="1062" y="724">one service account per workload</text>
+
+      <!-- ===== Delivery strip ===== -->
+      <rect class="band" x="20" y="795" width="1235" height="60" rx="6"/>
+      <text class="tag" x="36" y="815">DELIVERY</text>
+      <text class="s" x="36" y="834">GitHub Actions → OpenTofu IaC (one module per cloud) → cosign-signed image in Harbor → Argo CD GitOps rollout of Helm charts · Blazor WASM → object storage + CDN · optional MAUI builds → TestFlight / Play internal testing</text>
+      <text class="s" x="36" y="848">Automated gates before promotion: cross-tenant denial (NFR-01) · payment-blind regression (T03) · PHI block (T01) · prompt-injection suite (T10)</text>
+    </svg>
+    </div>
+    <figcaption>The Blazor web client and the optional iOS and Android apps share one Razor component library and call the same API through the CDN and the cluster's ingress gateway. api owns all writes and checks intake through Presidio before anything is stored. worker runs the AI orchestrator, takes jobs from RabbitMQ, calls models only through the LLM gateway, and fetches data only through mcp, which connects to PostgreSQL with a read-only, view-only role. The commercial database has no role for any of those identities.</figcaption>
+  </figure>
+
+  <h2 class="sec">Logical component to portable choice</h2>
+  <p class="sub">Each part of the logical view, the open component that carries it, and the managed service you could swap in on each cloud without changing application code.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Logical component</th><th>Portable choice</th><th>Azure</th><th>Google Cloud</th><th>AWS</th></tr></thead>
+      <tbody>
+        <tr><td>Container runtime</td><td>Conformant Kubernetes + Helm, KEDA for queue scaling</td><td>AKS</td><td>GKE</td><td>EKS</td></tr>
+        <tr><td>Identity &amp; access</td><td>Keycloak (OIDC), one realm for providers and one for CTC staff</td><td>Entra External ID</td><td>Identity Platform</td><td>Cognito</td></tr>
+        <tr><td>Edge + WAF</td><td>Any CDN with OWASP CRS rules; Envoy Gateway or NGINX ingress</td><td>Front Door + WAF</td><td>Cloud CDN + Cloud Armor</td><td>CloudFront + AWS WAF</td></tr>
+        <tr><td>API + domain modules</td><td>api: .NET modular monolith container</td><td colspan="3">Same container on every cloud</td></tr>
+        <tr><td>AI orchestrator + validator</td><td>worker container with no database credentials</td><td colspan="3">Same container on every cloud</td></tr>
+        <tr><td>MCP tool server</td><td>mcp container, read-only views bound to org_id (ADR-0001)</td><td colspan="3">Same container on every cloud</td></tr>
+        <tr><td>LLM gateway</td><td>LiteLLM proxy: quotas, logging, routing, pinned model versions</td><td>Azure OpenAI behind it</td><td>Vertex AI behind it</td><td>Bedrock behind it</td></tr>
+        <tr><td>Prompt-injection defence</td><td>Self-hosted guard model applied by the gateway to vendor text (NFR-05, T10)</td><td>AI Content Safety</td><td>Model Armor</td><td>Bedrock Guardrails</td></tr>
+        <tr><td>Prohibited-data guard</td><td>Microsoft Presidio container, custom health recognizers (REQ-01, T01)</td><td>AI Language</td><td>Sensitive Data Protection</td><td>Comprehend Medical</td></tr>
+        <tr><td>Tenant + catalog data</td><td>PostgreSQL 16 with FORCE RLS; app-level hash-chained audit (NFR-01, NFR-04)</td><td>PostgreSQL Flexible Server</td><td>Cloud SQL for PostgreSQL</td><td>RDS for PostgreSQL</td></tr>
+        <tr><td>Commercial accounts</td><td>Separate PostgreSQL database, no role for matching, worker or MCP (NFR-03)</td><td colspan="3">Separate instance or database on the same managed service</td></tr>
+        <tr><td>Job queue</td><td>RabbitMQ via MassTransit (transport-neutral .NET library)</td><td>Service Bus</td><td>Pub/Sub</td><td>SQS / Amazon MQ</td></tr>
+        <tr><td>Evidence files</td><td>S3-compatible object storage with object lock; storage interface in code</td><td>Blob Storage (adapter)</td><td>Cloud Storage</td><td>S3</td></tr>
+        <tr><td>Secrets + keys</td><td>OpenBao / Vault, synced by External Secrets Operator</td><td>Key Vault</td><td>Secret Manager</td><td>Secrets Manager / KMS</td></tr>
+        <tr><td>Observability</td><td>OpenTelemetry SDK → Grafana, Loki, Tempo (PHI-free, NFR-02)</td><td>Azure Monitor</td><td>Cloud Observability</td><td>CloudWatch / X-Ray</td></tr>
+        <tr><td>Push (optional)</td><td>Direct FCM and APNs from api; message carries no tenant content</td><td>Notification Hubs</td><td>Firebase</td><td>SNS</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <section class="notes2" aria-label="Design notes">
+    <div class="note"><h2>Portability has a cost</h2><p>Running Keycloak, RabbitMQ, Vault and the observability stack yourself adds operations work the Azure and GCP designs avoid. With a 50% DevOps engineer, use the cloud's managed Kubernetes and PostgreSQL, and keep the open components to the few that carry portability.</p></div>
+    <div class="note"><h2>Portable code, not portable everything</h2><p>Write the app against standards (OIDC, OpenTelemetry, the S3 API, PostgreSQL, MassTransit) and keep cloud specifics in OpenTofu modules and adapters. The containers and Helm charts stay identical; only infrastructure modules change per cloud.</p></div>
+    <div class="note"><h2>Model choice stays open</h2><p>The LLM gateway lets the pilot switch between hosted models or a self-hosted model under vLLM for data residency. Every switch must pass the full evaluation harness, including the injection and grounding suites, before release.</p></div>
+    <div class="note"><h2>Check before committing</h2><p>Confirm Canadian-region availability for the chosen model provider, guard model licence terms, and whether Presidio's health recognizers need custom patterns for long-term-care terms. Without ledger tables, the hash-chained audit is the app's job and needs its own tests.</p></div>
+  </section>
+
+  <footer>Sources: JulesCare HL-BRD v1.0, ADR-0001, ADR-0002, Technical Architecture and Collaboration Exercise, and the JulesCare Azure and Google Cloud system diagrams. The component choices and cloud equivalents are proposals for the pilot, not decisions recorded in the source documents.</footer>
+</div>
